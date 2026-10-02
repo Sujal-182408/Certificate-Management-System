@@ -1,0 +1,593 @@
+/* ================================
+   EDIT CERTIFICATE
+================================ */
+
+.edit-certificate-page {
+  min-height: 100vh;
+  padding: 40px;
+  background: #0b0d10;
+  color: #ffffff;
+}
+
+
+/* ================================
+   TOP BAR
+================================ */
+
+.edit-certificate-topbar {
+  max-width: 1100px;
+  margin: 0 auto 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.edit-title-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.edit-title-icon {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 12px;
+
+  background: #1c2533;
+  color: #4f9cff;
+}
+
+.edit-title-section h1 {
+  margin: 0;
+
+  font-size: 27px;
+  font-weight: 700;
+}
+
+.edit-title-section p {
+  margin: 5px 0 0;
+
+  color: #7f8997;
+  font-size: 14px;
+}
+
+
+/* ================================
+   BACK BUTTON
+================================ */
+
+.edit-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 11px 17px;
+
+  border: 1px solid #29313c;
+  border-radius: 9px;
+
+  background: #15191f;
+  color: #d7dce3;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.edit-back-btn:hover {
+  background: #1d232b;
+  border-color: #3b4654;
+}
+
+
+/* ================================
+   MAIN LAYOUT
+================================ */
+
+.edit-certificate-layout {
+  max-width: 1100px;
+  margin: auto;
+
+  display: grid;
+  grid-template-columns: 1fr 300px;
+
+  gap: 25px;
+}
+
+
+/* ================================
+   FORM CARD
+================================ */
+
+.edit-certificate-card {
+  background: #12161b;
+
+  border: 1px solid #262d36;
+  border-radius: 16px;
+
+  overflow: hidden;
+}
+
+
+/* ================================
+   CARD HEADER
+================================ */
+
+.edit-card-header {
+  padding: 23px 27px;
+
+  border-bottom: 1px solid #262d36;
+}
+
+.edit-card-header h2 {
+  margin: 0;
+
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.edit-card-header p {
+  margin: 6px 0 0;
+
+  color: #737e8c;
+  font-size: 13px;
+}
+
+
+/* ================================
+   FORM
+================================ */
+
+.edit-certificate-form {
+  padding: 28px;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  gap: 22px;
+}
+
+.edit-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+
+/* ================================
+   LABEL
+================================ */
+
+.edit-form-group label {
+  margin-bottom: 8px;
+
+  color: #cbd1d9;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.required {
+  color: #ef6666;
+  margin-left: 3px;
+}
+
+
+/* ================================
+   INPUTS
+================================ */
+
+.edit-form-group input,
+.edit-form-group select,
+.edit-form-group textarea {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 13px 14px;
+
+  border: 1px solid #2b333e;
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #0d1014;
+  color: #ffffff;
+
+  font-size: 14px;
+
+  transition: 0.2s ease;
+}
+
+.edit-form-group input:hover,
+.edit-form-group select:hover,
+.edit-form-group textarea:hover {
+  border-color: #3a4552;
+}
+
+.edit-form-group input:focus,
+.edit-form-group select:focus,
+.edit-form-group textarea:focus {
+  border-color: #3f8cff;
+
+  box-shadow: 0 0 0 3px rgba(63, 140, 255, 0.1);
+}
+
+.edit-form-group input::placeholder,
+.edit-form-group textarea::placeholder {
+  color: #59636f;
+}
+
+.edit-form-group textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+
+/* ================================
+   HELP TEXT
+================================ */
+
+.field-help {
+  margin-top: 6px;
+
+  color: #687381;
+
+  font-size: 11px;
+}
+
+
+/* ================================
+   FOOTER
+================================ */
+
+.edit-form-footer {
+  grid-column: 1 / -1;
+
+  margin-top: 8px;
+  padding-top: 22px;
+
+  border-top: 1px solid #262d36;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.edit-footer-info {
+  color: #687381;
+  font-size: 12px;
+}
+
+.edit-footer-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+
+/* ================================
+   CANCEL BUTTON
+================================ */
+
+.cancel-edit-btn {
+  padding: 11px 20px;
+
+  border: 1px solid #303844;
+  border-radius: 8px;
+
+  background: #181d23;
+  color: #c5cbd3;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.cancel-edit-btn:hover {
+  background: #222830;
+}
+
+
+/* ================================
+   SAVE BUTTON
+================================ */
+
+.save-edit-btn {
+  padding: 11px 22px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: #347ff2;
+  color: #ffffff;
+
+  display: flex;
+  align-items: center;
+  gap: 7px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.save-edit-btn:hover {
+  background: #256bd5;
+  transform: translateY(-1px);
+}
+
+.save-edit-btn:disabled,
+.cancel-edit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* ================================
+   SIDEBAR
+================================ */
+
+.edit-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+
+/* ================================
+   PREVIEW
+================================ */
+
+.edit-preview-card {
+  padding: 22px;
+
+  background: #12161b;
+
+  border: 1px solid #262d36;
+  border-radius: 15px;
+}
+
+.edit-preview-card h3 {
+  margin: 0 0 18px;
+
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.preview-certificate {
+  padding: 20px;
+
+  border: 1px solid #303945;
+  border-radius: 11px;
+
+  background: #0d1014;
+}
+
+.preview-label {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #697482;
+
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.preview-value {
+  margin-bottom: 16px;
+
+  color: #e9edf2;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  word-break: break-word;
+}
+
+.preview-recipient {
+  color: #4f9cff;
+  font-size: 19px;
+}
+
+
+/* ================================
+   STATUS
+================================ */
+
+.preview-status {
+  display: inline-block;
+
+  padding: 6px 11px;
+
+  border-radius: 20px;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+}
+
+.preview-status.issued {
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.preview-status.revoked {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+
+/* ================================
+   WARNING
+================================ */
+
+.edit-warning-card {
+  padding: 19px;
+
+  border: 1px solid #39301c;
+  border-radius: 14px;
+
+  background: #17140e;
+}
+
+.edit-warning-card h3 {
+  margin: 0 0 8px;
+
+  color: #eab308;
+
+  font-size: 14px;
+}
+
+.edit-warning-card p {
+  margin: 0;
+
+  color: #898477;
+
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+
+/* ================================
+   SUCCESS
+================================ */
+
+.edit-success-message {
+  max-width: 1100px;
+
+  margin: 0 auto 20px;
+
+  padding: 13px 17px;
+
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 9px;
+
+  background: rgba(34, 197, 94, 0.08);
+
+  color: #4ade80;
+
+  font-size: 13px;
+}
+
+
+/* ================================
+   ERROR
+================================ */
+
+.edit-error-message {
+  max-width: 1100px;
+
+  margin: 0 auto 20px;
+
+  padding: 13px 17px;
+
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 9px;
+
+  background: rgba(239, 68, 68, 0.08);
+
+  color: #f87171;
+
+  font-size: 13px;
+}
+
+
+/* ================================
+   LOADING
+================================ */
+
+.edit-loading {
+  min-height: 70vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #7c8795;
+
+  font-size: 15px;
+}
+
+
+/* ================================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 950px) {
+
+  .edit-certificate-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+}
+
+
+@media (max-width: 700px) {
+
+  .edit-certificate-page {
+    padding: 25px 16px;
+  }
+
+  .edit-certificate-topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-title-section h1 {
+    font-size: 23px;
+  }
+
+  .edit-certificate-form {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .edit-form-group.full-width {
+    grid-column: auto;
+  }
+
+  .edit-form-footer {
+    grid-column: auto;
+
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-footer-buttons {
+    width: 100%;
+  }
+
+  .cancel-edit-btn,
+  .save-edit-btn {
+    flex: 1;
+  }
+
+  .edit-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+}

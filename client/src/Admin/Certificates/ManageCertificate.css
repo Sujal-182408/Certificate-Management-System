@@ -1,0 +1,446 @@
+.manage-certificate {
+  min-height: 100vh;
+  padding: 40px;
+  background: #0b0f14;
+  color: #f8fafc;
+}
+
+/* ================= HEADER ================= */
+
+.manage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.manage-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #64748b;
+}
+
+.manage-header h1 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.manage-description {
+  margin-top: 10px;
+  color: #94a3b8;
+}
+
+/* ================= ADD BUTTON ================= */
+
+.add-certificate-btn {
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 13px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.add-certificate-btn:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* ================= STATS ================= */
+
+.certificate-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 22px;
+  transition: 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: #334155;
+  transform: translateY(-2px);
+}
+
+.stat-card span {
+  display: block;
+  color: #94a3b8;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.stat-card strong {
+  color: #f8fafc;
+  font-size: 30px;
+}
+
+/* ================= TOOLBAR ================= */
+
+.certificate-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 0 14px;
+  transition: 0.2s ease;
+}
+
+.search-box:focus-within {
+  border-color: #3b82f6;
+}
+
+.search-box span {
+  font-size: 22px;
+  color: #64748b;
+}
+
+.search-box input {
+  width: 100%;
+  height: 46px;
+  border: none;
+  outline: none;
+  padding-left: 10px;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.search-box input::placeholder {
+  color: #64748b;
+}
+
+/* ================= SELECT ================= */
+
+.certificate-toolbar select {
+  height: 46px;
+  min-width: 150px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 0 15px;
+  outline: none;
+  cursor: pointer;
+}
+
+.certificate-toolbar select:focus {
+  border-color: #3b82f6;
+}
+
+.certificate-toolbar select option {
+  background: #111827;
+  color: #f8fafc;
+}
+
+/* ================= REFRESH ================= */
+
+.refresh-btn {
+  height: 46px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+  color: #cbd5e1;
+  padding: 0 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.refresh-btn:hover {
+  background: #1e293b;
+  border-color: #334155;
+  color: #ffffff;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================= ERROR ================= */
+
+.certificate-error {
+  padding: 15px;
+  margin-bottom: 20px;
+  background: #2a1215;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  color: #fca5a5;
+}
+
+/* ================= LOADING ================= */
+
+.certificate-loading {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 60px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+/* ================= TABLE ================= */
+
+.certificate-table-container {
+  width: 100%;
+  overflow-x: auto;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.certificate-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+}
+
+/* TABLE HEADER */
+
+.certificate-table th {
+  padding: 16px;
+  text-align: left;
+  background: #151c27;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid #1f2937;
+}
+
+/* TABLE BODY */
+
+.certificate-table td {
+  padding: 16px;
+  border-top: 1px solid #1f2937;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.certificate-table td strong {
+  color: #f8fafc;
+}
+
+/* ROW HOVER */
+
+.certificate-table tbody tr {
+  transition: 0.15s ease;
+}
+
+.certificate-table tbody tr:hover {
+  background: #151c27;
+}
+
+/* ================= STATUS ================= */
+
+.certificate-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-issued {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.status-revoked {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+.status-expired {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.status-default {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid #334155;
+  color: #94a3b8;
+}
+
+/* ================= ACTIONS ================= */
+
+.certificate-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.certificate-actions button {
+  border: 1px solid transparent;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.certificate-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* VIEW */
+
+.view-btn {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.2) !important;
+  color: #38bdf8;
+}
+
+.view-btn:hover {
+  background: rgba(14, 165, 233, 0.22);
+}
+
+/* EDIT */
+
+.edit-btn {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.2) !important;
+  color: #a78bfa;
+}
+
+.edit-btn:hover {
+  background: rgba(139, 92, 246, 0.22);
+}
+
+/* REVOKE */
+
+.revoke-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.2) !important;
+  color: #fbbf24;
+}
+
+.revoke-btn:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
+/* DELETE */
+
+.delete-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  color: #f87171;
+}
+
+.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+/* ================= EMPTY ================= */
+
+.no-certificates {
+  text-align: center;
+  padding: 70px !important;
+  color: #64748b !important;
+}
+
+/* ================= FOOTER ================= */
+
+.certificate-count {
+  margin-top: 18px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.certificate-count strong {
+  color: #cbd5e1;
+}
+
+/* ================= SCROLLBAR ================= */
+
+.certificate-table-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.certificate-table-container::-webkit-scrollbar-track {
+  background: #0b0f14;
+}
+
+.certificate-table-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+
+.certificate-table-container::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 900px) {
+
+  .manage-certificate {
+    padding: 25px;
+  }
+
+  .manage-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .certificate-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .certificate-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex-basis: 100%;
+  }
+
+}
+
+@media (max-width: 600px) {
+
+  .manage-certificate {
+    padding: 18px;
+  }
+
+  .manage-header h1 {
+    font-size: 28px;
+  }
+
+  .certificate-toolbar select,
+  .refresh-btn {
+    flex: 1;
+  }
+
+}
