@@ -1,11 +1,9 @@
-
 import { Link, Route, Routes } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 
-// =========================================================
+// =========================
 // PUBLIC PAGES
-// =========================================================
-
+// =========================
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -13,34 +11,38 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import CertificateView from "./pages/CertificateView";
 
-// =========================================================
+// =========================
 // PROTECTED ROUTES
-// =========================================================
-
+// =========================
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 
-// =========================================================
+// =========================
 // ADMIN PAGES
-// =========================================================
-
+// =========================
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./Admin/AdminDashboard";
 
+// =========================
+// ADMIN CERTIFICATES
+// =========================
 import AddCertificate from "./Admin/Certificates/AddCertificate";
 import ManageCertificate from "./Admin/Certificates/ManageCertificates";
 import AdminViewCertificate from "./Admin/Certificates/ViewCertificate";
 import EditCertificate from "./Admin/Certificates/EditCertificate";
+
+// =========================
+// ADMIN EMPLOYEES
+// =========================
 import AdminEmployees from "./Admin/Certificates/AdminEmployees";
+import EmployeeDetails from "./Admin/Certificates/EmployeeDetails";
 
-// =========================================================
+// =========================
 // 404 PAGE
-// =========================================================
-
+// =========================
 function NotFound() {
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center bg-[#080b10] px-5 text-center text-white">
-
       <ShieldCheck
         size={55}
         className="mb-5 text-cyan-400"
@@ -61,48 +63,33 @@ function NotFound() {
       <Link
         to="/"
         className="
-          mt-7
-          inline-flex
-          h-11
-          items-center
-          justify-center
-          rounded-xl
-          bg-cyan-400
-          px-6
-          text-sm
-          font-bold
-          text-slate-950
-          transition
-          hover:bg-cyan-300
+          mt-7 inline-flex h-11 items-center justify-center
+          rounded-xl bg-cyan-400 px-6
+          text-sm font-bold text-slate-950
+          transition hover:bg-cyan-300
         "
       >
         Back to Home
       </Link>
-
     </div>
   );
 }
 
-// =========================================================
+// =========================
 // APP
-// =========================================================
-
+// =========================
 function App() {
   return (
     <Routes>
 
-      {/* =====================================================
-          HOME
-      ===================================================== */}
+      {/* =====================================
+          PUBLIC ROUTES
+      ====================================== */}
 
       <Route
         path="/"
         element={<Home />}
       />
-
-      {/* =====================================================
-          EMPLOYEE AUTH
-      ===================================================== */}
 
       <Route
         path="/login"
@@ -114,30 +101,20 @@ function App() {
         element={<Register />}
       />
 
-      {/* =====================================================
-          PUBLIC QR VERIFICATION
-      ===================================================== */}
-
       <Route
         path="/verify"
         element={<VerifyCertificate />}
       />
-
-      {/* =====================================================
-          PUBLIC CERTIFICATE VIEW
-
-          Example:
-          /certificate/view?token=UUID
-      ===================================================== */}
 
       <Route
         path="/certificate/view"
         element={<CertificateView />}
       />
 
-      {/* =====================================================
-          EMPLOYEE DASHBOARD
-      ===================================================== */}
+
+      {/* =====================================
+          EMPLOYEE PROTECTED ROUTE
+      ====================================== */}
 
       <Route
         path="/dashboard"
@@ -148,18 +125,20 @@ function App() {
         }
       />
 
-      {/* =====================================================
+
+      {/* =====================================
           ADMIN LOGIN
-      ===================================================== */}
+      ====================================== */}
 
       <Route
         path="/admin/login"
         element={<AdminLogin />}
       />
 
-      {/* =====================================================
+
+      {/* =====================================
           ADMIN DASHBOARD
-      ===================================================== */}
+      ====================================== */}
 
       <Route
         path="/admin"
@@ -170,10 +149,12 @@ function App() {
         }
       />
 
-      {/* =====================================================
-          ADMIN EMPLOYEES
-      ===================================================== */}
 
+      {/* =====================================
+          ADMIN EMPLOYEE MANAGEMENT
+      ====================================== */}
+
+      {/* Employee Management */}
       <Route
         path="/admin/employees"
         element={
@@ -183,12 +164,24 @@ function App() {
         }
       />
 
-      {/* =====================================================
-          MANAGE CERTIFICATES
-      ===================================================== */}
-
+      {/* Employee Details */}
       <Route
-        path="/admin/Certificates"
+        path="/admin/employees/:id"
+        element={
+          <AdminProtectedRoute>
+            <EmployeeDetails />
+          </AdminProtectedRoute>
+        }
+      />
+
+
+      {/* =====================================
+          ADMIN CERTIFICATE MANAGEMENT
+      ====================================== */}
+
+      {/* Certificate Management */}
+      <Route
+        path="/admin/certificates"
         element={
           <AdminProtectedRoute>
             <ManageCertificate />
@@ -196,10 +189,7 @@ function App() {
         }
       />
 
-      {/* =====================================================
-          ADD CERTIFICATE
-      ===================================================== */}
-
+      {/* Create Certificate */}
       <Route
         path="/admin/certificates/new"
         element={
@@ -209,10 +199,7 @@ function App() {
         }
       />
 
-      {/* =====================================================
-          VIEW CERTIFICATE
-      ===================================================== */}
-
+      {/* View Certificate */}
       <Route
         path="/admin/certificates/:id"
         element={
@@ -222,10 +209,7 @@ function App() {
         }
       />
 
-      {/* =====================================================
-          EDIT CERTIFICATE
-      ===================================================== */}
-
+      {/* Edit Certificate */}
       <Route
         path="/admin/certificates/:id/edit"
         element={
@@ -235,9 +219,10 @@ function App() {
         }
       />
 
-      {/* =====================================================
+
+      {/* =====================================
           404
-      ===================================================== */}
+      ====================================== */}
 
       <Route
         path="*"

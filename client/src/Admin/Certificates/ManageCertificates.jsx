@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Plus, Eye, Pencil, Ban, RefreshCw } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api";
+import "./ManageCertificate.css";
+
+const API_URL = "/api";
 
 export default function ManageCertificates() {
   const navigate = useNavigate();
@@ -9,7 +12,12 @@ export default function ManageCertificates() {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [revokingId, setRevokingId] = useState(null);
 
+  // ========================================
+  // FETCH CERTIFICATES
+  // ========================================
   const fetchCertificates = async () => {
     try {
       setLoading(true);
@@ -20,14 +28,17 @@ export default function ManageCertificates() {
         {
           method: "GET",
           credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
         }
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to fetch certificates"
+          data?.message || "Failed to fetch certificates."
         );
       }
 
@@ -35,160 +46,373 @@ export default function ManageCertificates() {
     } catch (error) {
       console.error("Certificate fetch error:", error);
 
-      if (error?.message) {
-        setError(error.message);
-      } else {
-        setError("Unable to fetch certificates.");
-      }
+      setError(
+        error?.message || "Unable to fetch certificates."
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // ========================================
+  // INITIAL LOAD
+  // ========================================
   useEffect(() => {
     fetchCertificates();
   }, []);
 
+  // ========================================
+  // FORMAT DATE
+  // ========================================
   const formatDate = (date) => {
     if (!date) return "—";
 
-    return new Date(date).toLocaleDateString("en-IN", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "—";
+    }
+
+    return parsedDate.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   };
 
+  // ========================================
+  // VIEW
+  // ========================================
   const handleView = (id) => {
     navigate(`/admin/certificates/${id}`);
   };
 
+  // ========================================
+  // EDIT
+  // ========================================
   const handleEdit = (id) => {
     navigate(`/admin/certificates/${id}/edit`);
   };
 
+  // ========================================
+  // REVOKE
+  // ========================================
+  const handleRevoke = async (certificate) => {
+    if (!certificate?.id) return;
+
+    if (certificate.status === "revoked") return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to revoke certificate "${certificate.certificate_no}"?\n\n` +
+        `Recipient: ${certificate.recipient_name || "—"}\n` +
+        `Course: ${certificate.course_name || "—"}\n\n` +
+        `After revocation, this certificate will no longer be considered valid.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setRevokingId(certificate.id);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/admin/certificates/${certificate.id}/revoke`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Failed to revoke certificate."
+        );
+      }
+
+      setCertificates((current) =>
+        current.map((item) =>
+          String(item.id) === String(certificate.id)
+            ? {
+                ...item,
+                status: "revoked",
+                revoked_at:
+                  data?.certificate?.revoked_at ||
+                  new Date().toISOString(),
+              }
+            : item
+        )
+      );
+
+      setSuccess(
+        data?.message ||
+          `Certificate ${certificate.certificate_no} has been revoked successfully.`
+      );
+    } catch (error) {
+      console.error("Certificate revoke error:", error);
+
+      setError(
+        error?.message ||
+          "Unable to revoke certificate."
+      );
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  // ========================================
+  // STATISTICS
+  // ========================================
+  const totalCertificates = certificates.length;
+
+  const issuedCertificates = certificates.filter(
+    (certificate) => certificate.status === "issued"
+  ).length;
+
+  const revokedCertificates = certificates.filter(
+    (certificate) => certificate.status === "revoked"
+  ).length;
+
+  // ========================================
+  // LOADING
+  // ========================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
+      <div className="manage-certificate">
+        <div className="certificate-loading">
+          <div className="certificate-spinner"></div>
 
-          <p className="text-gray-400">
-            Loading certificates...
-          </p>
+          <p>Loading certificates...</p>
         </div>
       </div>
     );
   }
 
+  // ========================================
+  // MAIN
+  // ========================================
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10">
-      <div className="max-w-7xl mx-auto">
+    <div className="manage-certificate">
+      <div className="manage-container">
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold">
-              Manage Certificates
-            </h1>
-
-            <p className="text-gray-400 mt-2">
-              View and manage all issued certificates.
-            </p>
-          </div>
+        {/* ==================================
+            TOP NAVIGATION
+        ================================== */}
+        <div className="manage-topbar">
 
           <button
-            onClick={() => navigate("/admin/certificates/new")}
-            className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-5 py-3 rounded-lg transition"
+            type="button"
+            className="back-dashboard-btn"
+            onClick={() => navigate("/admin")}
           >
-            + Add Certificate
+            <ArrowLeft size={17} />
+
+            <span>Back to Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={fetchCertificates}
+            title="Refresh certificates"
+          >
+            <RefreshCw size={17} />
+
+            <span>Refresh</span>
           </button>
 
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-6 bg-red-950 border border-red-700 text-red-300 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-4">
+        {/* ==================================
+            HEADER
+        ================================== */}
+        <div className="manage-header">
 
-              <div>
-                <p className="font-semibold">
-                  Failed to load certificates
-                </p>
+          <div className="manage-title-section">
 
-                <p className="text-sm mt-1">
-                  {error}
-                </p>
-              </div>
+            <p className="manage-label">
+              CERTIFICATE MANAGEMENT
+            </p>
 
-              <button
-                onClick={fetchCertificates}
-                className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-white text-sm"
-              >
-                Retry
-              </button>
+            <h1>
+              Manage Certificates
+            </h1>
 
+            <p className="manage-description">
+              View, edit and revoke issued certificates.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            className="add-certificate-btn"
+            onClick={() =>
+              navigate("/admin/certificates/new")
+            }
+          >
+            <Plus size={18} />
+
+            <span>Add Certificate</span>
+          </button>
+
+        </div>
+
+        {/* ==================================
+            SUCCESS
+        ================================== */}
+        {success && (
+          <div className="certificate-success">
+
+            <div>
+              <strong>Success</strong>
+
+              <p>{success}</p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setSuccess("")}
+              aria-label="Close success message"
+            >
+              ×
+            </button>
+
           </div>
         )}
 
-        {/* Empty */}
+        {/* ==================================
+            ERROR
+        ================================== */}
+        {error && (
+          <div className="certificate-error">
+
+            <div>
+              <strong>
+                Certificate operation failed
+              </strong>
+
+              <p>{error}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              aria-label="Close error message"
+            >
+              ×
+            </button>
+
+          </div>
+        )}
+
+        {/* ==================================
+            STATISTICS
+        ================================== */}
+        <div className="certificate-stats">
+
+          <div className="stat-card">
+            <span>Total Certificates</span>
+
+            <strong>
+              {totalCertificates}
+            </strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Issued</span>
+
+            <strong className="stat-issued">
+              {issuedCertificates}
+            </strong>
+          </div>
+
+          <div className="stat-card">
+            <span>Revoked</span>
+
+            <strong className="stat-revoked">
+              {revokedCertificates}
+            </strong>
+          </div>
+
+        </div>
+
+        {/* ==================================
+            EMPTY STATE
+        ================================== */}
         {!error && certificates.length === 0 && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-            <h2 className="text-xl font-semibold">
+          <div className="no-certificates">
+
+            <div className="empty-icon">
+              <Ban size={32} />
+            </div>
+
+            <h2>
               No certificates found
             </h2>
 
-            <p className="text-gray-400 mt-2">
+            <p>
               Create your first certificate to see it here.
             </p>
 
             <button
-              onClick={() => navigate("/admin/certificates/new")}
-              className="mt-6 bg-cyan-500 hover:bg-cyan-400 text-black font-semibold px-5 py-3 rounded-lg"
+              type="button"
+              className="empty-create-btn"
+              onClick={() =>
+                navigate("/admin/certificates/new")
+              }
             >
+              <Plus size={18} />
+
               Create Certificate
             </button>
+
           </div>
         )}
 
-        {/* Desktop Table */}
+        {/* ==================================
+            CERTIFICATE TABLE
+        ================================== */}
         {certificates.length > 0 && (
-          <div className="hidden md:block bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="certificate-table-wrapper">
 
-            <div className="overflow-x-auto">
+            <div className="table-scroll">
 
-              <table className="w-full text-left">
+              <table className="certificate-table">
 
-                <thead className="bg-gray-800">
+                <thead>
                   <tr>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Certificate No.
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Recipient
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Course
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Issuer
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Issue Date
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold">
+                    <th>
                       Status
                     </th>
 
-                    <th className="px-6 py-4 text-gray-300 font-semibold text-right">
+                    <th>
                       Actions
                     </th>
 
@@ -197,86 +421,194 @@ export default function ManageCertificates() {
 
                 <tbody>
 
-                  {certificates.map((certificate) => (
-                    <tr
-                      key={certificate.id}
-                      className="border-t border-gray-800 hover:bg-gray-800/50 transition"
-                    >
+                  {certificates.map(
+                    (certificate) => {
 
-                      <td className="px-6 py-5">
-                        <span className="font-mono text-cyan-400">
-                          {certificate.certificate_no}
-                        </span>
-                      </td>
+                      const isRevoked =
+                        certificate.status === "revoked";
 
-                      <td className="px-6 py-5">
-                        <div>
-                          <p className="font-semibold">
-                            {certificate.recipient_name || "—"}
-                          </p>
+                      const isRevoking =
+                        String(revokingId) ===
+                        String(certificate.id);
 
-                          {certificate.employee_email && (
-                            <p className="text-sm text-gray-500">
-                              {certificate.employee_email}
-                            </p>
-                          )}
-                        </div>
-                      </td>
+                      return (
+                        <tr key={certificate.id}>
 
-                      <td className="px-6 py-5 text-gray-300">
-                        {certificate.course_name || "—"}
-                      </td>
+                          {/* CERTIFICATE NUMBER */}
+                          <td>
+                            <span className="certificate-number">
+                              {
+                                certificate.certificate_no ||
+                                "—"
+                              }
+                            </span>
+                          </td>
 
-                      <td className="px-6 py-5 text-gray-300">
-                        {certificate.issuer_name || "—"}
-                      </td>
+                          {/* RECIPIENT */}
+                          <td>
 
-                      <td className="px-6 py-5 text-gray-300">
-                        {formatDate(certificate.issue_date)}
-                      </td>
+                            <div className="recipient-cell">
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                            certificate.status === "issued"
-                              ? "bg-green-950 text-green-400 border border-green-800"
-                              : certificate.status === "revoked"
-                              ? "bg-red-950 text-red-400 border border-red-800"
-                              : "bg-gray-800 text-gray-300 border border-gray-700"
-                          }`}
-                        >
-                          {certificate.status || "unknown"}
-                        </span>
-                      </td>
+                              <strong>
+                                {
+                                  certificate.recipient_name ||
+                                  "—"
+                                }
+                              </strong>
 
-                      <td className="px-6 py-5">
+                              {certificate.employee_email && (
+                                <span>
+                                  {
+                                    certificate.employee_email
+                                  }
+                                </span>
+                              )}
 
-                        <div className="flex justify-end gap-2">
+                            </div>
 
-                          <button
-                            onClick={() =>
-                              handleView(certificate.id)
+                          </td>
+
+                          {/* COURSE */}
+                          <td>
+                            <span className="course-cell">
+                              {
+                                certificate.course_name ||
+                                "—"
+                              }
+                            </span>
+                          </td>
+
+                          {/* ISSUER */}
+                          <td>
+                            {
+                              certificate.issuer_name ||
+                              "—"
                             }
-                            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm"
-                          >
-                            View
-                          </button>
+                          </td>
 
-                          <button
-                            onClick={() =>
-                              handleEdit(certificate.id)
-                            }
-                            className="px-3 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg text-sm font-semibold"
-                          >
-                            Edit
-                          </button>
+                          {/* DATE */}
+                          <td>
+                            {formatDate(
+                              certificate.issue_date
+                            )}
+                          </td>
 
-                        </div>
+                          {/* STATUS */}
+                          <td>
 
-                      </td>
+                            <div className="status-wrapper">
 
-                    </tr>
-                  ))}
+                              <span
+                                className={`certificate-status ${
+                                  certificate.status ===
+                                  "issued"
+                                    ? "status-issued"
+                                    : certificate.status ===
+                                      "revoked"
+                                    ? "status-revoked"
+                                    : "status-default"
+                                }`}
+                              >
+                                {
+                                  certificate.status ||
+                                  "unknown"
+                                }
+                              </span>
+
+                              {certificate.revoked_at && (
+                                <small>
+                                  Revoked:{" "}
+                                  {formatDate(
+                                    certificate.revoked_at
+                                  )}
+                                </small>
+                              )}
+
+                            </div>
+
+                          </td>
+
+                          {/* ACTIONS */}
+                          <td>
+
+                            <div className="certificate-actions">
+
+                              <button
+                                type="button"
+                                className="view-btn"
+                                onClick={() =>
+                                  handleView(
+                                    certificate.id
+                                  )
+                                }
+                                title="View certificate"
+                              >
+                                <Eye size={15} />
+
+                                <span>
+                                  View
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="edit-btn"
+                                onClick={() =>
+                                  handleEdit(
+                                    certificate.id
+                                  )
+                                }
+                                disabled={isRevoked}
+                                title={
+                                  isRevoked
+                                    ? "Revoked certificates cannot be edited"
+                                    : "Edit certificate"
+                                }
+                              >
+                                <Pencil size={15} />
+
+                                <span>
+                                  Edit
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="revoke-btn"
+                                onClick={() =>
+                                  handleRevoke(
+                                    certificate
+                                  )
+                                }
+                                disabled={
+                                  isRevoked ||
+                                  isRevoking
+                                }
+                                title={
+                                  isRevoked
+                                    ? "Certificate already revoked"
+                                    : "Revoke certificate"
+                                }
+                              >
+                                <Ban size={15} />
+
+                                <span>
+                                  {isRevoking
+                                    ? "Revoking..."
+                                    : isRevoked
+                                    ? "Revoked"
+                                    : "Revoke"}
+                                </span>
+                              </button>
+
+                            </div>
+
+                          </td>
+
+                        </tr>
+                      );
+                    }
+                  )}
 
                 </tbody>
 
@@ -284,115 +616,30 @@ export default function ManageCertificates() {
 
             </div>
 
+            {/* Mobile scroll hint */}
+            <div className="mobile-table-hint">
+              ← Swipe horizontally to view all certificate details →
+            </div>
+
           </div>
         )}
 
-        {/* Mobile Cards */}
+        {/* ==================================
+            FOOTER
+        ================================== */}
         {certificates.length > 0 && (
-          <div className="md:hidden space-y-4">
+          <div className="certificate-count">
 
-            {certificates.map((certificate) => (
-              <div
-                key={certificate.id}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-5"
-              >
+            Showing{" "}
 
-                <div className="flex justify-between items-start gap-4">
+            <strong>
+              {certificates.length}
+            </strong>{" "}
 
-                  <div>
-                    <p className="text-cyan-400 font-mono text-sm">
-                      {certificate.certificate_no}
-                    </p>
-
-                    <h2 className="text-lg font-semibold mt-2">
-                      {certificate.recipient_name || "—"}
-                    </h2>
-                  </div>
-
-                  <span
-                    className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${
-                      certificate.status === "issued"
-                        ? "bg-green-950 text-green-400"
-                        : certificate.status === "revoked"
-                        ? "bg-red-950 text-red-400"
-                        : "bg-gray-800 text-gray-300"
-                    }`}
-                  >
-                    {certificate.status || "unknown"}
-                  </span>
-
-                </div>
-
-                <div className="mt-5 space-y-3 text-sm">
-
-                  <div>
-                    <p className="text-gray-500">
-                      Course
-                    </p>
-
-                    <p className="text-gray-200">
-                      {certificate.course_name || "—"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">
-                      Issuer
-                    </p>
-
-                    <p className="text-gray-200">
-                      {certificate.issuer_name || "—"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-500">
-                      Issue Date
-                    </p>
-
-                    <p className="text-gray-200">
-                      {formatDate(certificate.issue_date)}
-                    </p>
-                  </div>
-
-                  {certificate.employee_email && (
-                    <div>
-                      <p className="text-gray-500">
-                        Employee
-                      </p>
-
-                      <p className="text-gray-200">
-                        {certificate.employee_email}
-                      </p>
-                    </div>
-                  )}
-
-                </div>
-
-                <div className="flex gap-2 mt-6">
-
-                  <button
-                    onClick={() =>
-                      handleView(certificate.id)
-                    }
-                    className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
-                  >
-                    View
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleEdit(certificate.id)
-                    }
-                    className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg font-semibold"
-                  >
-                    Edit
-                  </button>
-
-                </div>
-
-              </div>
-            ))}
+            certificate
+            {certificates.length !== 1
+              ? "s"
+              : ""}
 
           </div>
         )}

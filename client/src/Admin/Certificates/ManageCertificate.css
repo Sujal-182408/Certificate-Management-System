@@ -1,446 +1,889 @@
+/* ========================================
+   MAIN PAGE
+======================================== */
+
 .manage-certificate {
   min-height: 100vh;
-  padding: 40px;
-  background: #0b0f14;
-  color: #f8fafc;
+  width: 100%;
+  background: #080b10;
+  color: #ffffff;
+  padding: 30px 20px;
+  box-sizing: border-box;
 }
 
-/* ================= HEADER ================= */
+.manage-container {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+
+/* ========================================
+   TOP BAR
+======================================== */
+
+.manage-topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 28px;
+}
+
+.back-dashboard-btn,
+.refresh-btn {
+  border: 1px solid #263241;
+  background: #10161f;
+  color: #cbd5e1;
+  min-height: 42px;
+  padding: 0 15px;
+  border-radius: 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.back-dashboard-btn:hover,
+.refresh-btn:hover {
+  background: #16202c;
+  border-color: #22d3ee;
+  color: #22d3ee;
+}
+
+
+/* ========================================
+   HEADER
+======================================== */
 
 .manage-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-end;
-  gap: 25px;
+  justify-content: space-between;
+  gap: 30px;
+
   margin-bottom: 30px;
+}
+
+.manage-title-section {
+  min-width: 0;
 }
 
 .manage-label {
   margin: 0 0 8px;
+
+  color: #22d3ee;
+
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 2px;
-  color: #64748b;
 }
 
-.manage-header h1 {
+.manage-title-section h1 {
   margin: 0;
+
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.1;
+  font-weight: 800;
+
   color: #f8fafc;
-  font-size: 34px;
-  font-weight: 700;
 }
 
 .manage-description {
-  margin-top: 10px;
+  margin: 10px 0 0;
+
   color: #94a3b8;
+
+  font-size: 15px;
+  line-height: 1.6;
 }
 
-/* ================= ADD BUTTON ================= */
+
+/* ========================================
+   ADD BUTTON
+======================================== */
 
 .add-certificate-btn {
-  border: 1px solid #2563eb;
-  background: #2563eb;
-  color: #ffffff;
-  padding: 13px 20px;
-  border-radius: 10px;
-  font-weight: 700;
+  flex-shrink: 0;
+
+  min-height: 46px;
+  padding: 0 18px;
+
+  border: 0;
+  border-radius: 11px;
+
+  background: #22d3ee;
+  color: #061018;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  font-size: 14px;
+  font-weight: 800;
+
   cursor: pointer;
   transition: 0.2s ease;
 }
 
 .add-certificate-btn:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: #67e8f9;
   transform: translateY(-1px);
 }
 
-/* ================= STATS ================= */
+
+/* ========================================
+   SUCCESS / ERROR
+======================================== */
+
+.certificate-success,
+.certificate-error {
+  width: 100%;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+
+  padding: 15px 17px;
+  margin-bottom: 22px;
+
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.certificate-success {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.certificate-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.certificate-success strong {
+  color: #34d399;
+}
+
+.certificate-error strong {
+  color: #f87171;
+}
+
+.certificate-success p,
+.certificate-error p {
+  margin: 4px 0 0;
+
+  color: #cbd5e1;
+
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.certificate-success > button,
+.certificate-error > button {
+  border: 0;
+  background: transparent;
+
+  color: #94a3b8;
+
+  font-size: 24px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.certificate-success > button:hover,
+.certificate-error > button:hover {
+  color: #ffffff;
+}
+
+
+/* ========================================
+   STATISTICS
+======================================== */
 
 .certificate-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 18px;
+
   margin-bottom: 25px;
 }
 
 .stat-card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
-  padding: 22px;
-  transition: 0.2s ease;
-}
+  min-width: 0;
 
-.stat-card:hover {
-  border-color: #334155;
-  transform: translateY(-2px);
+  padding: 20px;
+
+  border: 1px solid #202a36;
+  border-radius: 14px;
+
+  background: #0d1219;
+
+  box-sizing: border-box;
 }
 
 .stat-card span {
   display: block;
-  color: #94a3b8;
-  font-size: 14px;
+
   margin-bottom: 8px;
+
+  color: #94a3b8;
+
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .stat-card strong {
   color: #f8fafc;
+
   font-size: 30px;
+  line-height: 1;
 }
 
-/* ================= TOOLBAR ================= */
-
-.certificate-toolbar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+.stat-issued {
+  color: #34d399 !important;
 }
 
-.search-box {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
-  padding: 0 14px;
-  transition: 0.2s ease;
+.stat-revoked {
+  color: #f87171 !important;
 }
 
-.search-box:focus-within {
-  border-color: #3b82f6;
-}
 
-.search-box span {
-  font-size: 22px;
-  color: #64748b;
-}
+/* ========================================
+   TABLE WRAPPER
+======================================== */
 
-.search-box input {
+.certificate-table-wrapper {
   width: 100%;
-  height: 46px;
-  border: none;
-  outline: none;
-  padding-left: 10px;
-  background: transparent;
-  color: #f8fafc;
-  font-size: 14px;
+
+  border: 1px solid #202a36;
+  border-radius: 15px;
+
+  background: #0d1219;
+
+  overflow: hidden;
 }
 
-.search-box input::placeholder {
-  color: #64748b;
-}
-
-/* ================= SELECT ================= */
-
-.certificate-toolbar select {
-  height: 46px;
-  min-width: 150px;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
-  background: #111827;
-  color: #e2e8f0;
-  padding: 0 15px;
-  outline: none;
-  cursor: pointer;
-}
-
-.certificate-toolbar select:focus {
-  border-color: #3b82f6;
-}
-
-.certificate-toolbar select option {
-  background: #111827;
-  color: #f8fafc;
-}
-
-/* ================= REFRESH ================= */
-
-.refresh-btn {
-  height: 46px;
-  border: 1px solid #1f2937;
-  border-radius: 10px;
-  background: #111827;
-  color: #cbd5e1;
-  padding: 0 16px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.2s ease;
-}
-
-.refresh-btn:hover {
-  background: #1e293b;
-  border-color: #334155;
-  color: #ffffff;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ================= ERROR ================= */
-
-.certificate-error {
-  padding: 15px;
-  margin-bottom: 20px;
-  background: #2a1215;
-  border: 1px solid #7f1d1d;
-  border-radius: 10px;
-  color: #fca5a5;
-}
-
-/* ================= LOADING ================= */
-
-.certificate-loading {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
-  padding: 60px;
-  text-align: center;
-  color: #94a3b8;
-}
-
-/* ================= TABLE ================= */
-
-.certificate-table-container {
+.table-scroll {
   width: 100%;
   overflow-x: auto;
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 14px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  overflow-y: hidden;
+
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0d1219;
 }
+
+.table-scroll::-webkit-scrollbar {
+  height: 7px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: #0d1219;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 20px;
+}
+
+
+/* ========================================
+   TABLE
+======================================== */
 
 .certificate-table {
   width: 100%;
-  min-width: 1100px;
-  border-collapse: collapse;
-}
 
-/* TABLE HEADER */
+  min-width: 1050px;
+
+  border-collapse: collapse;
+
+  text-align: left;
+}
 
 .certificate-table th {
-  padding: 16px;
-  text-align: left;
-  background: #151c27;
-  color: #94a3b8;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  border-bottom: 1px solid #1f2937;
-}
+  padding: 15px 16px;
 
-/* TABLE BODY */
+  background: #111821;
+  border-bottom: 1px solid #263241;
+
+  color: #94a3b8;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+
+  white-space: nowrap;
+}
 
 .certificate-table td {
-  padding: 16px;
-  border-top: 1px solid #1f2937;
+  padding: 17px 16px;
+
+  border-bottom: 1px solid #1b2530;
+
   color: #cbd5e1;
+
   font-size: 14px;
+
+  vertical-align: middle;
 }
 
-.certificate-table td strong {
-  color: #f8fafc;
+.certificate-table tbody tr:last-child td {
+  border-bottom: 0;
 }
-
-/* ROW HOVER */
 
 .certificate-table tbody tr {
-  transition: 0.15s ease;
+  transition: background 0.2s ease;
 }
 
 .certificate-table tbody tr:hover {
-  background: #151c27;
+  background: rgba(34, 211, 238, 0.025);
 }
 
-/* ================= STATUS ================= */
+
+/* ========================================
+   CERTIFICATE NUMBER
+======================================== */
+
+.certificate-number {
+  display: inline-block;
+
+  color: #22d3ee;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  white-space: nowrap;
+}
+
+
+/* ========================================
+   RECIPIENT
+======================================== */
+
+.recipient-cell {
+  min-width: 180px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recipient-cell strong {
+  color: #f1f5f9;
+
+  font-size: 14px;
+}
+
+.recipient-cell span {
+  color: #64748b;
+
+  font-size: 12px;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* ========================================
+   COURSE
+======================================== */
+
+.course-cell {
+  display: block;
+
+  max-width: 220px;
+
+  color: #cbd5e1;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* ========================================
+   STATUS
+======================================== */
+
+.status-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
 
 .certificate-status {
   display: inline-flex;
   align-items: center;
-  padding: 6px 11px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 700;
+  justify-content: center;
+
+  min-height: 26px;
+
+  padding: 0 10px;
+
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 800;
+
   text-transform: capitalize;
+
+  white-space: nowrap;
 }
 
 .status-issued {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #4ade80;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
 }
 
 .status-revoked {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.25);
   color: #f87171;
 }
 
-.status-expired {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #fbbf24;
-}
-
 .status-default {
   background: rgba(148, 163, 184, 0.1);
-  border: 1px solid #334155;
+  border: 1px solid rgba(148, 163, 184, 0.25);
   color: #94a3b8;
 }
 
-/* ================= ACTIONS ================= */
+.status-wrapper small {
+  color: #64748b;
+  font-size: 10px;
+}
+
+
+/* ========================================
+   ACTIONS
+======================================== */
 
 .certificate-actions {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+
+  white-space: nowrap;
 }
 
-.certificate-actions button {
-  border: 1px solid transparent;
-  padding: 7px 10px;
-  border-radius: 7px;
+.view-btn,
+.edit-btn,
+.revoke-btn {
+  min-height: 34px;
+
+  padding: 0 10px;
+
+  border-radius: 8px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+
   font-size: 12px;
   font-weight: 700;
+
   cursor: pointer;
-  transition: 0.15s ease;
+
+  transition: 0.2s ease;
 }
 
-.certificate-actions button:disabled {
+.view-btn {
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.08);
+  color: #22d3ee;
+}
+
+.view-btn:hover {
+  background: rgba(34, 211, 238, 0.16);
+}
+
+.edit-btn {
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  background: rgba(168, 85, 247, 0.08);
+  color: #c084fc;
+}
+
+.edit-btn:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.16);
+}
+
+.revoke-btn {
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+}
+
+.revoke-btn:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.16);
+}
+
+.view-btn:disabled,
+.edit-btn:disabled,
+.revoke-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* VIEW */
 
-.view-btn {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.2) !important;
-  color: #38bdf8;
+/* ========================================
+   MOBILE TABLE HINT
+======================================== */
+
+.mobile-table-hint {
+  display: none;
+
+  padding: 10px 15px;
+
+  border-top: 1px solid #202a36;
+
+  color: #64748b;
+
+  font-size: 11px;
+
+  text-align: center;
 }
 
-.view-btn:hover {
-  background: rgba(14, 165, 233, 0.22);
-}
 
-/* EDIT */
-
-.edit-btn {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.2) !important;
-  color: #a78bfa;
-}
-
-.edit-btn:hover {
-  background: rgba(139, 92, 246, 0.22);
-}
-
-/* REVOKE */
-
-.revoke-btn {
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.2) !important;
-  color: #fbbf24;
-}
-
-.revoke-btn:hover {
-  background: rgba(245, 158, 11, 0.22);
-}
-
-/* DELETE */
-
-.delete-btn {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.2) !important;
-  color: #f87171;
-}
-
-.delete-btn:hover {
-  background: rgba(239, 68, 68, 0.22);
-}
-
-/* ================= EMPTY ================= */
+/* ========================================
+   EMPTY STATE
+======================================== */
 
 .no-certificates {
+  width: 100%;
+
+  padding: 60px 20px;
+
+  border: 1px solid #202a36;
+  border-radius: 15px;
+
+  background: #0d1219;
+
   text-align: center;
-  padding: 70px !important;
-  color: #64748b !important;
+
+  box-sizing: border-box;
 }
 
-/* ================= FOOTER ================= */
+.empty-icon {
+  width: 62px;
+  height: 62px;
+
+  margin: 0 auto 18px;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(34, 211, 238, 0.08);
+  color: #22d3ee;
+}
+
+.no-certificates h2 {
+  margin: 0;
+
+  color: #f8fafc;
+
+  font-size: 22px;
+}
+
+.no-certificates p {
+  margin: 9px 0 22px;
+
+  color: #64748b;
+
+  font-size: 14px;
+}
+
+.empty-create-btn {
+  min-height: 42px;
+
+  padding: 0 17px;
+
+  border: 0;
+  border-radius: 9px;
+
+  background: #22d3ee;
+  color: #061018;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+
+/* ========================================
+   FOOTER COUNT
+======================================== */
 
 .certificate-count {
-  margin-top: 18px;
+  padding: 15px 4px;
+
   color: #64748b;
-  font-size: 13px;
+
+  font-size: 12px;
+
+  text-align: right;
 }
 
 .certificate-count strong {
   color: #cbd5e1;
 }
 
-/* ================= SCROLLBAR ================= */
 
-.certificate-table-container::-webkit-scrollbar {
-  height: 8px;
+/* ========================================
+   LOADING
+======================================== */
+
+.certificate-loading {
+  min-height: 70vh;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 15px;
+
+  color: #94a3b8;
 }
 
-.certificate-table-container::-webkit-scrollbar-track {
-  background: #0b0f14;
+.certificate-spinner {
+  width: 32px;
+  height: 32px;
+
+  border: 3px solid #263241;
+  border-top-color: #22d3ee;
+
+  border-radius: 50%;
+
+  animation: certificateSpin 0.8s linear infinite;
 }
 
-.certificate-table-container::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
+@keyframes certificateSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.certificate-table-container::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
 
-/* ================= RESPONSIVE ================= */
+/* ========================================
+   TABLET
+======================================== */
 
 @media (max-width: 900px) {
 
   .manage-certificate {
-    padding: 25px;
+    padding: 24px 16px;
   }
 
   .manage-header {
-    flex-direction: column;
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .add-certificate-btn {
+    width: 100%;
   }
 
   .certificate-stats {
-    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .certificate-toolbar {
-    flex-wrap: wrap;
+  .stat-card {
+    padding: 16px;
   }
 
-  .search-box {
-    flex-basis: 100%;
+  .stat-card strong {
+    font-size: 26px;
   }
 
 }
 
+
+/* ========================================
+   MOBILE
+======================================== */
+
 @media (max-width: 600px) {
 
   .manage-certificate {
-    padding: 18px;
+    padding: 18px 12px;
   }
 
-  .manage-header h1 {
-    font-size: 28px;
+  .manage-topbar {
+    margin-bottom: 22px;
   }
 
-  .certificate-toolbar select,
+  .back-dashboard-btn,
   .refresh-btn {
-    flex: 1;
+    min-height: 40px;
+    padding: 0 11px;
+
+    font-size: 12px;
   }
 
+  .back-dashboard-btn span,
+  .refresh-btn span {
+    display: none;
+  }
+
+  .manage-header {
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+
+  .manage-title-section h1 {
+    font-size: 29px;
+  }
+
+  .manage-description {
+    font-size: 13px;
+  }
+
+  .manage-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+  }
+
+  .add-certificate-btn {
+    min-height: 44px;
+  }
+
+  .certificate-stats {
+    grid-template-columns: 1fr;
+
+    gap: 10px;
+
+    margin-bottom: 18px;
+  }
+
+  .stat-card {
+    padding: 15px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-card span {
+    margin: 0;
+  }
+
+  .stat-card strong {
+    font-size: 24px;
+  }
+
+  .certificate-success,
+  .certificate-error {
+    padding: 13px;
+
+    font-size: 12px;
+  }
+
+  .certificate-table-wrapper {
+    border-radius: 11px;
+  }
+
+  .certificate-table {
+    min-width: 980px;
+  }
+
+  .certificate-table th,
+  .certificate-table td {
+    padding: 13px 12px;
+  }
+
+  .mobile-table-hint {
+    display: block;
+  }
+
+  .certificate-actions {
+    gap: 5px;
+  }
+
+  .view-btn,
+  .edit-btn,
+  .revoke-btn {
+    min-height: 32px;
+    padding: 0 8px;
+
+    font-size: 11px;
+  }
+
+  .view-btn span,
+  .edit-btn span,
+  .revoke-btn span {
+    display: none;
+  }
+
+  .no-certificates {
+    padding: 45px 15px;
+  }
+
+  .no-certificates h2 {
+    font-size: 19px;
+  }
+
+  .certificate-count {
+    text-align: center;
+  }
+}
+
+
+/* ========================================
+   VERY SMALL PHONES
+======================================== */
+
+@media (max-width: 380px) {
+
+  .manage-certificate {
+    padding: 15px 9px;
+  }
+
+  .manage-title-section h1 {
+    font-size: 25px;
+  }
+
+  .manage-topbar {
+    gap: 8px;
+  }
+
+  .back-dashboard-btn,
+  .refresh-btn {
+    min-height: 38px;
+  }
+
+  .add-certificate-btn {
+    min-height: 42px;
+    font-size: 13px;
+  }
+
+  .certificate-table {
+    min-width: 940px;
+  }
 }

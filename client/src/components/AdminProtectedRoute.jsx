@@ -1,42 +1,90 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "/api";
 
-export default function AdminProtectedRoute({ children }) {
+export default function AdminProtectedRoute({
+  children,
+}) {
+  const location = useLocation();
+
   const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] =
+    useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    let mounted = true;
+
+    async function checkAuth() {
       try {
         const response = await fetch(
           `${API_URL}/auth/me`,
           {
             method: "GET",
             credentials: "include",
+            headers: {
+              Accept: "application/json",
+            },
           }
         );
 
-        const data = await response.json();
+        const data =
+          await response.json().catch(() => ({}));
 
-        console.log("AdminProtectedRoute /me:", data);
+        console.log(
+          "🔐 AdminProtectedRoute /me:",
+          response.status,
+          data
+        );
 
-        if (response.ok && data.admin) {
+        if (!mounted) {
+          return;
+        }
+
+        if (
+          response.ok &&
+          data?.admin?.role === "admin" &&
+          data?.admin?.is_active === true
+        ) {
+          console.log(
+            "✅ Admin session verified:",
+            data.admin.email
+          );
+
           setAuthenticated(true);
         } else {
+          console.log(
+            "❌ Admin session invalid."
+          );
+
           setAuthenticated(false);
         }
       } catch (error) {
-        console.error("AdminProtectedRoute error:", error);
-        setAuthenticated(false);
+        console.error(
+          "❌ AdminProtectedRoute error:",
+          error
+        );
+
+        if (mounted) {
+          setAuthenticated(false);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    };
+    }
 
     checkAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  // =====================================================
+  // LOADING
+  // =====================================================
 
   if (loading) {
     return (
@@ -51,14 +99,30 @@ export default function AdminProtectedRoute({ children }) {
           fontSize: "20px",
         }}
       >
-        Loading...
+        Loading admin session...
       </div>
     );
   }
 
+  // =====================================================
+  // NOT AUTHENTICATED
+  // =====================================================
+
   if (!authenticated) {
-    return <Navigate to="/admin/login" replace />;
+    return (
+      <Navigate
+        to="/admin/login"
+        replace
+        state={{
+          from: location,
+        }}
+      />
+    );
   }
+
+  // =====================================================
+  // AUTHENTICATED
+  // =====================================================
 
   return children;
 }

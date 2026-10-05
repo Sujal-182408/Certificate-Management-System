@@ -23,6 +23,64 @@ import {
 
 import { apiRequest } from "../services/api";
 
+
+// =========================================================
+// NORMALIZE CERTIFICATE
+// Backend may return snake_case.
+// Frontend uses camelCase.
+// =========================================================
+
+function normalizeCertificate(raw = {}) {
+  return {
+    id: raw.id ?? null,
+
+    certificateNo:
+      raw.certificateNo ??
+      raw.certificate_no ??
+      "",
+
+    recipientName:
+      raw.recipientName ??
+      raw.recipient_name ??
+      "",
+
+    courseName:
+      raw.courseName ??
+      raw.course_name ??
+      "",
+
+    issuerName:
+      raw.issuerName ??
+      raw.issuer_name ??
+      "",
+
+    issueDate:
+      raw.issueDate ??
+      raw.issue_date ??
+      "",
+
+    verificationToken:
+      raw.verificationToken ??
+      raw.verification_token ??
+      "",
+
+    status:
+      raw.status ??
+      "issued",
+
+    createdAt:
+      raw.createdAt ??
+      raw.created_at ??
+      "",
+
+    revokedAt:
+      raw.revokedAt ??
+      raw.revoked_at ??
+      "",
+  };
+}
+
+
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
 
@@ -30,7 +88,8 @@ export default function EmployeeDashboard() {
   // STATE
   // =========================================================
 
-  const [employee, setEmployee] = useState(null);
+  const [employee, setEmployee] =
+    useState(null);
 
   const [certificate, setCertificate] =
     useState(null);
@@ -81,16 +140,48 @@ export default function EmployeeDashboard() {
         );
 
       console.log(
+        "========== EMPLOYEE DEBUG =========="
+      );
+
+      console.log(
         "EMPLOYEE DATA:",
         employeeData
       );
 
+      console.log(
+        "EMPLOYEE OBJECT:",
+        employeeData?.employee
+      );
+
+      console.log(
+        "EMPLOYEE NAME:",
+        employeeData?.employee?.name
+      );
+
+      console.log(
+        "EMPLOYEE EMAIL:",
+        employeeData?.employee?.email
+      );
+
+      console.log(
+        "===================================="
+      );
+
+
+      // -------------------------------------------------------
+      // EMPLOYEE NOT FOUND
+      // -------------------------------------------------------
 
       if (!employeeData?.employee) {
-        navigate("/login");
-        return;
+        throw new Error(
+          "Employee information was not returned."
+        );
       }
 
+
+      // -------------------------------------------------------
+      // SAVE EMPLOYEE
+      // -------------------------------------------------------
 
       setEmployee(
         employeeData.employee
@@ -110,21 +201,48 @@ export default function EmployeeDashboard() {
             }
           );
 
-
         console.log(
           "EXISTING QR DATA:",
           qrData
         );
 
 
-        if (qrData?.url) {
+        // -----------------------------------------------------
+        // BACKEND MAY RETURN verificationUrl OR url
+        // -----------------------------------------------------
+
+        const existingVerificationUrl =
+          qrData?.verificationUrl ||
+          qrData?.url;
+
+
+        // -----------------------------------------------------
+        // EXISTING QR FOUND
+        // -----------------------------------------------------
+
+        if (existingVerificationUrl) {
+
           setVerificationUrl(
-            qrData.url
+            existingVerificationUrl
           );
 
-          setCertificate(
-            qrData.certificate || null
-          );
+
+          // ---------------------------------------------------
+          // LOAD CERTIFICATE
+          // ---------------------------------------------------
+
+          if (qrData?.certificate) {
+            setCertificate(
+              normalizeCertificate(
+                qrData.certificate
+              )
+            );
+          }
+
+
+          // ---------------------------------------------------
+          // SHOW QR
+          // ---------------------------------------------------
 
           setQrGenerated(true);
         }
@@ -132,10 +250,10 @@ export default function EmployeeDashboard() {
       } catch (qrError) {
 
         /*
-         * 404 means the employee does not
-         * have a generated QR yet.
+         * Employee may not have generated
+         * QR yet.
          *
-         * Do NOT redirect to login here.
+         * Do NOT redirect to login.
          */
 
         console.log(
@@ -151,12 +269,38 @@ export default function EmployeeDashboard() {
         error
       );
 
-      navigate("/login");
+
+      // -------------------------------------------------------
+      // AUTHENTICATION ERROR
+      // -------------------------------------------------------
+
+      if (
+        error?.status === 401 ||
+        error?.status === 403
+      ) {
+        navigate(
+          "/login",
+          {
+            replace: true,
+          }
+        );
+
+        return;
+      }
+
+
+      // -------------------------------------------------------
+      // OTHER ERROR
+      // -------------------------------------------------------
+
+      setError(
+        error?.message ||
+          "Unable to load employee dashboard."
+      );
 
     } finally {
 
       setLoading(false);
-
     }
   }
 
@@ -167,6 +311,7 @@ export default function EmployeeDashboard() {
 
   async function generateQR() {
     try {
+
       setQrLoading(true);
       setError("");
       setCopied(false);
@@ -191,25 +336,43 @@ export default function EmployeeDashboard() {
       // VERIFICATION URL
       // -------------------------------------------------------
 
-      if (!data?.url) {
+      const newVerificationUrl =
+        data?.verificationUrl ||
+        data?.url;
+
+
+      if (!newVerificationUrl) {
+
+        console.error(
+          "QR response does not contain URL:",
+          data
+        );
+
         throw new Error(
           "Verification URL was not returned."
         );
       }
 
 
+      // -------------------------------------------------------
+      // SAVE VERIFICATION URL
+      // -------------------------------------------------------
+
       setVerificationUrl(
-        data.url
+        newVerificationUrl
       );
 
 
       // -------------------------------------------------------
-      // CERTIFICATE
+      // SAVE CERTIFICATE
       // -------------------------------------------------------
 
       if (data?.certificate) {
+
         setCertificate(
-          data.certificate
+          normalizeCertificate(
+            data.certificate
+          )
         );
       }
 
@@ -236,21 +399,18 @@ export default function EmployeeDashboard() {
     } finally {
 
       setQrLoading(false);
-
     }
   }
 
 
   // =========================================================
   // VERIFY CERTIFICATE
-  //
-  // Dashboard
-  //      ↓
-  // /verify?token=...
   // =========================================================
 
   function verifyCertificate() {
+
     if (!verificationUrl) {
+
       setError(
         "Verification link is not available."
       );
@@ -274,6 +434,7 @@ export default function EmployeeDashboard() {
 
 
       if (!token) {
+
         setError(
           "Verification token is missing."
         );
@@ -313,7 +474,9 @@ export default function EmployeeDashboard() {
   // =========================================================
 
   function viewCertificate() {
+
     if (!verificationUrl) {
+
       setError(
         "Verification link is not available."
       );
@@ -337,6 +500,7 @@ export default function EmployeeDashboard() {
 
 
       if (!token) {
+
         setError(
           "Verification token is missing."
         );
@@ -366,50 +530,122 @@ export default function EmployeeDashboard() {
   }
 
 
-  // =========================================================
-  // COPY VERIFICATION URL
-  // =========================================================
+ // =========================================================
+// COPY VERIFICATION URL
+// =========================================================
 
-  async function copyVerificationUrl() {
-    if (!verificationUrl) {
-      return;
-    }
+async function copyVerificationUrl() {
+  if (!verificationUrl) {
+    setError("Verification link is not available.");
+    return;
+  }
 
+  try {
+    // -------------------------------------------------------
+    // MODERN CLIPBOARD API
+    // Works on HTTPS / secure contexts
+    // -------------------------------------------------------
 
-    try {
-
+    if (
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
       await navigator.clipboard.writeText(
         verificationUrl
       );
+    } else {
+      // -----------------------------------------------------
+      // FALLBACK
+      // Required for HTTP LAN URL:
+      // http://192.168.1.5:5174
+      // -----------------------------------------------------
 
+      const textArea =
+        document.createElement("textarea");
 
-      setCopied(true);
+      textArea.value =
+        verificationUrl;
 
+      textArea.style.position =
+        "fixed";
 
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
+      textArea.style.left =
+        "-9999px";
 
-    } catch (error) {
+      textArea.style.top =
+        "0";
 
-      console.error(
-        "Copy error:",
-        error
+      textArea.style.width =
+        "1px";
+
+      textArea.style.height =
+        "1px";
+
+      textArea.style.opacity =
+        "0";
+
+      textArea.setAttribute(
+        "readonly",
+        ""
       );
 
-
-      setError(
-        "Unable to copy verification link."
+      document.body.appendChild(
+        textArea
       );
+
+      textArea.focus();
+      textArea.select();
+      textArea.setSelectionRange(
+        0,
+        textArea.value.length
+      );
+
+      const copiedSuccessfully =
+        document.execCommand(
+          "copy"
+        );
+
+      document.body.removeChild(
+        textArea
+      );
+
+      if (!copiedSuccessfully) {
+        throw new Error(
+          "Browser copy command failed."
+        );
+      }
     }
+
+    // -------------------------------------------------------
+    // SUCCESS
+    // -------------------------------------------------------
+
+    setCopied(true);
+    setError("");
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+
+  } catch (error) {
+    console.error(
+      "Copy verification URL error:",
+      error
+    );
+
+    setCopied(false);
+
+    setError(
+      "Unable to copy verification link. Please copy it manually."
+    );
   }
-
-
+}
   // =========================================================
   // LOGOUT
   // =========================================================
 
   async function logout() {
+
     try {
 
       await apiRequest(
@@ -428,8 +664,12 @@ export default function EmployeeDashboard() {
 
     } finally {
 
-      navigate("/login");
-
+      navigate(
+        "/login",
+        {
+          replace: true,
+        }
+      );
     }
   }
 
@@ -439,6 +679,7 @@ export default function EmployeeDashboard() {
   // =========================================================
 
   function formatDate(date) {
+
     if (!date) {
       return "-";
     }
@@ -473,13 +714,13 @@ export default function EmployeeDashboard() {
   // =========================================================
 
   if (loading) {
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#070b12] px-5 text-white">
 
         <div className="pointer-events-none absolute -left-40 -top-40 h-88 w-88 rounded-full bg-cyan-500/10 blur-[100px]" />
 
         <div className="pointer-events-none absolute -bottom-40 -right-40 h-88 w-88 rounded-full bg-blue-600/10 blur-[100px]" />
-
 
         <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.07] bg-white/[0.035] p-8 text-center shadow-2xl backdrop-blur-xl">
 
@@ -518,10 +759,7 @@ export default function EmployeeDashboard() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#070b12] text-white">
 
-
-      {/* =====================================================
-          BACKGROUND
-      ===================================================== */}
+      {/* BACKGROUND */}
 
       <div className="pointer-events-none fixed -left-55 top-[10%] h-105 w-105 rounded-full bg-cyan-500/10 blur-[110px]" />
 
@@ -714,6 +952,7 @@ export default function EmployeeDashboard() {
         =================================================== */}
 
         {error && (
+
           <div className="mb-5 flex items-center gap-3 rounded-xl border border-red-400/20 bg-red-400/6 px-4 py-3 text-xs text-red-300">
 
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-400/10 font-bold">
@@ -900,9 +1139,6 @@ export default function EmployeeDashboard() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2">
 
-
-                {/* CERT NUMBER */}
-
                 <CertificateDetail
                   label="Certificate Number"
                   value={
@@ -911,8 +1147,6 @@ export default function EmployeeDashboard() {
                   borderRight
                 />
 
-
-                {/* RECIPIENT */}
 
                 <CertificateDetail
                   label="Recipient"
@@ -923,8 +1157,6 @@ export default function EmployeeDashboard() {
                 />
 
 
-                {/* COURSE */}
-
                 <CertificateDetail
                   label="Course"
                   value={
@@ -933,8 +1165,6 @@ export default function EmployeeDashboard() {
                   borderRight
                 />
 
-
-                {/* ISSUER */}
 
                 <CertificateDetail
                   label="Issued By"
@@ -1024,11 +1254,6 @@ export default function EmployeeDashboard() {
 
           <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.035] shadow-2xl">
 
-
-            {/* =================================================
-                QR NOT GENERATED
-            ================================================= */}
-
             {!qrGenerated ? (
 
               <div className="p-5">
@@ -1058,8 +1283,6 @@ export default function EmployeeDashboard() {
 
                 </div>
 
-
-                {/* QR PREVIEW */}
 
                 <div className="mb-5 flex min-h-47.5 items-center justify-center rounded-xl border border-dashed border-white/9 bg-[radial-gradient(circle,rgba(34,211,238,0.06),transparent_65%)]">
 
@@ -1148,10 +1371,6 @@ export default function EmployeeDashboard() {
 
             ) : (
 
-              /* =================================================
-                 QR GENERATED
-              ================================================= */
-
               <div className="p-5">
 
                 <div className="mb-4 flex items-start justify-between">
@@ -1193,9 +1412,7 @@ export default function EmployeeDashboard() {
                 </div>
 
 
-                {/* =================================================
-                    REAL QR
-                ================================================= */}
+                {/* REAL QR */}
 
                 <div className="flex items-center justify-center rounded-xl border border-white/6 bg-white/1.5 p-5">
 
@@ -1230,14 +1447,9 @@ export default function EmployeeDashboard() {
                 </div>
 
 
-                {/* =================================================
-                    ACTIONS
-                ================================================= */}
+                {/* ACTIONS */}
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-
-
-                  {/* VERIFY */}
 
                   <button
                     type="button"
@@ -1255,8 +1467,6 @@ export default function EmployeeDashboard() {
 
                   </button>
 
-
-                  {/* COPY */}
 
                   <button
                     type="button"

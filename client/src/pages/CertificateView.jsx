@@ -1,55 +1,145 @@
-import { useEffect, useState } from "react";
-
+import React, { useEffect, useMemo, useState } from "react";
 import {
   useLocation,
+  useNavigate,
   useSearchParams,
 } from "react-router-dom";
-
 import { QRCodeSVG } from "qrcode.react";
-
-import { Loader2, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 
 import { apiRequest } from "../services/api";
-
-import BackButton from "../components/BackButton";
-
 import companyLogo from "../assets/logo.png";
+import sign from "../assets/sign.png";
 
+import "./CertificateView.css";
 
-export default function CertificateView() {
+// ============================================================
+// NORMALIZE BACKEND CERTIFICATE DATA
+// ============================================================
 
-  const [searchParams] = useSearchParams();
+function normalizeCertificate(raw = {}) {
+  return {
+    id: raw.id ?? null,
 
+    recipientName:
+      raw.recipientName ||
+      raw.recipient_name ||
+      raw.employeeName ||
+      raw.employee_name ||
+      "",
+
+    courseName:
+      raw.courseName ||
+      raw.course_name ||
+      "",
+
+    certificateNo:
+      raw.certificateNo ||
+      raw.certificate_no ||
+      "",
+
+    issueDate:
+      raw.issueDate ||
+      raw.issue_date ||
+      "",
+
+    issuerName:
+      raw.issuerName ||
+      raw.issuer_name ||
+      "",
+
+    verificationToken:
+      raw.verificationToken ||
+      raw.verification_token ||
+      "",
+
+    status:
+      raw.status ||
+      "",
+
+    employeeName:
+      raw.employeeName ||
+      raw.employee_name ||
+      raw.recipientName ||
+      raw.recipient_name ||
+      "",
+
+    employeeEmail:
+      raw.employeeEmail ||
+      raw.employee_email ||
+      "",
+
+    createdAt:
+      raw.createdAt ||
+      raw.created_at ||
+      "",
+
+    revokedAt:
+      raw.revokedAt ||
+      raw.revoked_at ||
+      "",
+  };
+}
+
+// ============================================================
+// TITLE CASE
+// ============================================================
+
+function toTitleCase(value = "") {
+  return value
+    .toLowerCase()
+    .replace(
+      /(^|[\s'-])([a-z])/g,
+      (_, separator, letter) =>
+        `${separator}${letter.toUpperCase()}`
+    );
+}
+
+// ============================================================
+// DATE FORMATTER
+// ============================================================
+
+function formatCertificateDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// ============================================================
+// CERTIFICATE VIEW
+// ============================================================
+
+const CertificateView = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const token = searchParams.get("token");
 
-
   const [certificate, setCertificate] = useState(null);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
-
-  /*
-   * ============================================================
-   * DETERMINE WHO IS VIEWING THE CERTIFICATE
-   * ============================================================
-   *
-   * Admin certificate:
-   * /admin/...
-   *
-   * Employee certificate:
-   * /certificate/...
-   * /verify/...
-   * /dashboard/...
-   *
-   * If the current pathname starts with /admin,
-   * the Back button goes to /admin.
-   *
-   * Otherwise it goes to the employee dashboard.
-   */
+  // ==========================================================
+  // ADMIN / EMPLOYEE DETECTION
+  // ==========================================================
 
   const isAdmin = location.pathname.startsWith("/admin");
 
@@ -57,648 +147,610 @@ export default function CertificateView() {
     ? "/admin"
     : "/dashboard";
 
+  // ==========================================================
+  // VERIFICATION URL
+  // IMPORTANT:
+  // This MUST use /verify?token=...
+  // because Admin QR and Employee QR use the same URL format.
+  // ==========================================================
+const verificationUrl = useMemo(() => {
+  if (!certificate?.verificationToken) {
+    return "";
+  }
 
-  /*
-   * ============================================================
-   * LOAD CERTIFICATE
-   * ============================================================
-   */
+  return `${window.location.origin}/verify?token=${encodeURIComponent(
+    certificate.verificationToken
+  )}`;
+}, [certificate?.verificationToken]);
+  // ==========================================================
+  // LOAD CERTIFICATE
+  // ==========================================================
 
   useEffect(() => {
+    let mounted = true;
 
     async function loadCertificate() {
-
-      if (!token) {
-
-        setError(
-          "Certificate verification token is missing."
-        );
-
-        setLoading(false);
-
-        return;
-      }
-
-
       try {
-
         setLoading(true);
-
         setError("");
 
+        if (!token) {
+          throw new Error(
+            "Certificate verification token is missing."
+          );
+        }
 
-        const result = await apiRequest(
+        const data = await apiRequest(
           `/verify/${encodeURIComponent(token)}`
         );
 
-
-        if (!result?.certificate) {
-
-          throw new Error(
-            "Certificate information was not returned."
-          );
-
+        if (!mounted) {
+          return;
         }
 
+        if (!data?.valid) {
+          throw new Error(
+            data?.message ||
+              "This certificate could not be verified."
+          );
+        }
 
-        setCertificate(result.certificate);
+        const normalized = normalizeCertificate(
+          data.certificate
+        );
 
+        setCertificate(normalized);
       } catch (err) {
-
         console.error(
-          "Certificate error:",
+          "Certificate verification error:",
           err
         );
 
+        if (!mounted) {
+          return;
+        }
+
         setError(
           err?.message ||
-          "Unable to verify this certificate."
+            "Unable to verify this certificate."
         );
-
       } finally {
-
-        setLoading(false);
-
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
     }
-
 
     loadCertificate();
 
+    return () => {
+      mounted = false;
+    };
   }, [token]);
 
-
-  /*
-   * ============================================================
-   * VERIFICATION URL
-   * ============================================================
-   *
-   * IMPORTANT:
-   * This uses the SAME existing certificate token.
-   * We are NOT generating a new UUID.
-   */
-
-  const verificationUrl = token
-    ? `${window.location.origin}/verify?token=${encodeURIComponent(
-        token
-      )}`
-    : "";
-
-
-  /*
-   * ============================================================
-   * LOADING
-   * ============================================================
-   */
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   if (loading) {
-
     return (
+      <div className="certificate-state-page">
+        <div className="certificate-state-card">
+          <Loader2
+            className="certificate-state-icon spin"
+            size={42}
+          />
 
-      <div className="min-h-screen bg-[#07111f] flex flex-col items-center justify-center text-white">
+          <h2>Verifying Certificate</h2>
 
-        <Loader2
-          size={45}
-          className="animate-spin text-cyan-400"
-        />
-
-        <h2 className="mt-5 text-xl font-semibold">
-          Loading Certificate...
-        </h2>
-
-        <p className="mt-2 text-gray-400 text-sm">
-          Please wait while we verify the certificate.
-        </p>
-
+          <p>
+            Please wait while we verify the certificate
+            with the official verification system.
+          </p>
+        </div>
       </div>
-
     );
-
   }
 
-
-  /*
-   * ============================================================
-   * ERROR
-   * ============================================================
-   */
+  // ==========================================================
+  // ERROR
+  // ==========================================================
 
   if (error || !certificate) {
-
     return (
+      <div className="certificate-state-page">
+        <div className="certificate-state-card certificate-error-card">
+          <AlertCircle
+            className="certificate-state-icon error-icon"
+            size={46}
+          />
 
-      <div className="min-h-screen bg-[#07111f] flex flex-col items-center justify-center px-5 text-white text-center">
+          <h2>Certificate Verification Failed</h2>
 
-        <ShieldCheck
-          size={60}
-          className="text-yellow-500"
-        />
+          <p>
+            {error ||
+              "The requested certificate could not be found."}
+          </p>
 
-        <h2 className="mt-5 text-2xl font-bold">
-          Certificate Unavailable
-        </h2>
+          <button
+            type="button"
+            className="certificate-back-button"
+            onClick={() => navigate(dashboardPath)}
+          >
+            <ArrowLeft size={18} />
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-        <p className="mt-3 max-w-md text-gray-400">
-          {error ||
-            "Certificate could not be loaded."}
-        </p>
+  // ==========================================================
+  // CERTIFICATE DATA
+  // ==========================================================
 
+  const recipientName =
+    certificate.recipientName ||
+    "Certificate Recipient";
 
-        <div className="mt-6">
+  const courseName =
+    certificate.courseName ||
+    "Completed Program";
 
-          <BackButton to={dashboardPath} />
+  const certificateNo =
+    certificate.certificateNo ||
+    "N/A";
 
+  const issuerName =
+    certificate.issuerName ||
+    "eSparks IT Solutions";
+
+  const issueDate =
+    formatCertificateDate(
+      certificate.issueDate
+    ) || "N/A";
+
+  const status =
+    certificate.status?.toLowerCase() ||
+    "issued";
+
+  const isIssued =
+    status === "issued";
+
+  // ==========================================================
+  // CERTIFICATE
+  // ==========================================================
+
+  return (
+    <div className="certificate-page">
+
+      {/* =====================================================
+          TOP ACTION BAR
+      ====================================================== */}
+
+      <div className="certificate-actions no-print">
+
+        <button
+          type="button"
+          className="certificate-dashboard-button"
+          onClick={() => navigate(dashboardPath)}
+        >
+          <ArrowLeft size={17} />
+          Dashboard
+        </button>
+
+        <div className="certificate-verification-status">
+          {isIssued ? (
+            <>
+              <CheckCircle2 size={17} />
+              Certificate Verified
+            </>
+          ) : (
+            <>
+              <AlertCircle size={17} />
+              Certificate Revoked
+            </>
+          )}
         </div>
 
       </div>
 
-    );
+      {/* =====================================================
+          CERTIFICATE DOCUMENT
+      ====================================================== */}
 
-  }
+      <div className="certificate-wrapper">
 
-
-  /*
-   * ============================================================
-   * FORMAT ISSUE DATE
-   * ============================================================
-   */
-
-  const formattedDate = certificate.issueDate
-    ? new Date(
-        certificate.issueDate
-      ).toLocaleDateString(
-        "en-IN",
-        {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        }
-      )
-    : "—";
-
-
-  /*
-   * ============================================================
-   * CERTIFICATE
-   * ============================================================
-   */
-
-  return (
-
-    <div className="min-h-screen bg-[#07111f] px-3 py-6 sm:px-6 lg:px-10">
-
-
-      {/* ========================================================
-          BACK BUTTON
-          ======================================================== */}
-
-      <div className="mx-auto mb-5 max-w-300">
-
-        <BackButton to={dashboardPath} />
-
-      </div>
-
-
-      {/* ========================================================
-          CERTIFICATE
-          ======================================================== */}
-
-      <main className="mx-auto w-full max-w-300">
-
-        <section
-          className="
-            relative
-            overflow-hidden
-            bg-white
-            shadow-[0_30px_80px_rgba(0,0,0,0.45)]
-            select-none
-          "
+        <div
+          className={`certificate-document ${
+            isIssued
+              ? ""
+              : "certificate-document-revoked"
+          }`}
         >
 
-
-          {/* ====================================================
-              OUTER GOLD BORDER
-              ==================================================== */}
-
-          <div
-            className="
-              m-3
-              border-2
-              border-[#c9a45c]
-              p-5
-              sm:m-4
-              sm:p-8
-              lg:p-10
-            "
-          >
-
-
-            {/* ==================================================
-                INNER BORDER
-                ================================================== */}
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                inset-5
-                border
-                border-[#c9a45c]/40
-                sm:inset-6.25
-                lg:inset-7.5
-              "
-            />
-
-
-            {/* ==================================================
-                HEADER
-                ================================================== */}
-
-            <header
-              className="
-                relative
-                z-10
-                flex
-                items-start
-                justify-between
-                gap-5
-              "
-            >
-
-
-              {/* =================================================
-                  COMPANY LOGO
-                  ================================================= */}
-
-              <div className="flex items-center gap-3 sm:gap-4">
-
-                <img
-                  src={companyLogo}
-                  alt="Company Logo"
-                  draggable="false"
-                  className="
-                    h-14
-                    w-14
-                    object-contain
-                    sm:h-20
-                    sm:w-35
-                  "
-                />
-
-              </div>
-
-
-              {/* =================================================
-                  QR CODE
-                  ================================================= */}
-
-              <div
-                className="
-                  flex
-                  flex-col
-                  items-center
-                  gap-2
-                  shrink-0
-                "
-              >
-
-                <div className="rounded-md bg-white p-1">
-
-                  <QRCodeSVG
-                    value={verificationUrl}
-                    size={135}
-                    bgColor="#ffffff"
-                    fgColor="#07111f"
-                    level="H"
-                    includeMargin
-                  />
-
-                </div>
-
-                <span
-                  className="
-                    text-[8px]
-                    font-extrabold
-                    tracking-[2px]
-                    text-[#07111f]
-                    sm:text-[10px]
-                  "
-                >
-                  SCAN TO VERIFY
-                </span>
-
-              </div>
-
-            </header>
-
-
-            {/* ==================================================
-                CENTER
-                ================================================== */}
-
-            <div
-              className="
-                relative
-                z-10
-                mx-auto
-                mt-12
-                max-w-4xl
-                text-center
-                sm:mt-16
-              "
-            >
-
-
-              {/* =================================================
-                  SMALL TITLE
-                  ================================================= */}
-
-              <p
-                className="
-                  text-xs
-                  font-semibold
-                  tracking-[4px]
-                  text-[#8b6b2f]
-                  sm:text-base
-                  sm:tracking-[6px]
-                "
-              >
-                CERTIFICATE
-              </p>
-
-
-              {/* =================================================
-                  MAIN TITLE
-                  ================================================= */}
-
-              <h1
-                className="
-                  mt-1
-                  text-4xl
-                  font-extrabold
-                  tracking-[2px]
-                  text-[#07111f]
-                  sm:text-5xl
-                  lg:text-6xl
-                "
-              >
-                OF COMPLETION
-              </h1>
-
-
-              {/* =================================================
-                  GOLD LINE
-                  ================================================= */}
-
-              <div className="mx-auto my-6 h-0.75 w-24 bg-[#c9a45c]" />
-
-
-              {/* =================================================
-                  DESCRIPTION
-                  ================================================= */}
-
-              <p className="text-sm text-gray-500 sm:text-base">
-                This certificate is proudly presented to
-              </p>
-
-
-              {/* =================================================
-                  EMPLOYEE NAME
-                  ================================================= */}
-
-              <h2
-                className="
-                  mt-3
-                  font-serif
-                  text-4xl
-                  italic
-                  font-semibold
-                  text-[#07111f]
-                  sm:text-5xl
-                  lg:text-6xl
-                "
-              >
-                {certificate.recipientName}
-              </h2>
-
-
-              {/* =================================================
-                  COMPLETION
-                  ================================================= */}
-
-              <p className="mt-6 text-sm text-gray-500 sm:text-base">
-                for successfully completing
-              </p>
-
-
-              {/* =================================================
-                  COURSE
-                  ================================================= */}
-
-              <h3
-                className="
-                  mt-2
-                  text-2xl
-                  font-bold
-                  text-[#8b6b2f]
-                  sm:text-3xl
-                "
-              >
-                {certificate.courseName}
-              </h3>
-
-
-              <p
-                className="
-                  mx-auto
-                  mt-5
-                  max-w-2xl
-                  text-sm
-                  leading-7
-                  text-gray-500
-                "
-              >
-                This certificate recognizes the successful
-                completion of the above-mentioned program.
-              </p>
-
-            </div>
-
-
-            {/* ==================================================
-                DETAILS
-                ================================================== */}
-
-            <div
-              className="
-                relative
-                z-10
-                mt-12
-                flex
-                flex-col
-                items-center
-                justify-between
-                gap-8
-                sm:mt-16
-                sm:flex-row
-                sm:gap-4
-              "
-            >
-
-
-              {/* =================================================
-                  CERTIFICATE NUMBER
-                  ================================================= */}
-
-              <div className="text-center sm:text-left">
-
-                <p
-                  className="
-                    text-[10px]
-                    uppercase
-                    tracking-[1.5px]
-                    text-gray-500
-                  "
-                >
-                  Certificate No.
-                </p>
-
-                <p
-                  className="
-                    mt-1
-                    text-sm
-                    font-bold
-                    text-[#07111f]
-                  "
-                >
-                  {certificate.certificateNo}
-                </p>
-
-              </div>
-
-
-              {/* =================================================
-                  VERIFIED SEAL
-                  ================================================= */}
-
-              <div
-                className="
-                  flex
-                  h-20
-                  w-20
-                  items-center
-                  justify-center
-                  rounded-full
-                  border-2
-                  border-[#c9a45c]
-                "
-              >
-
-                <div
-                  className="
-                    flex
-                    h-16
-                    w-16
-                    flex-col
-                    items-center
-                    justify-center
-                    rounded-full
-                    border
-                    border-dashed
-                    border-[#c9a45c]
-                    text-[#8b6b2f]
-                  "
-                >
-
-                  <ShieldCheck size={24} />
-
-                  <span
-                    className="
-                      mt-0.5
-                      text-[7px]
-                      font-extrabold
-                      tracking-[1px]
-                    "
-                  >
-                    VERIFIED
-                  </span>
-
-                </div>
-
-              </div>
-
-
-              {/* =================================================
-                  ISSUE DATE
-                  ================================================= */}
-
-              <div className="text-center sm:text-right">
-
-                <p
-                  className="
-                    text-[10px]
-                    uppercase
-                    tracking-[1.5px]
-                    text-gray-500
-                  "
-                >
-                  Issue Date
-                </p>
-
-                <p
-                  className="
-                    mt-1
-                    text-sm
-                    font-bold
-                    text-[#07111f]
-                  "
-                >
-                  {formattedDate}
-                </p>
-
-              </div>
-
-            </div>
-
-
-            {/* ==================================================
-                SIGNATURE
-                ================================================== */}
-
-            <div
-              className="
-                relative
-                z-10
-                mx-auto
-                mt-10
-                flex
-                w-52
-                flex-col
-                items-center
-                text-center
-              "
-            >
-
-              <div className="mb-2 w-44 border-t border-gray-500" />
-
-              <p className="text-xs font-bold text-[#07111f]">
-                Authorized by
-              </p>
-
-              <p className="mt-1 text-[11px] text-gray-500">
-                {certificate.issuerName}
-              </p>
-
-            </div>
-
+          {/* =================================================
+              SECURITY / WATERMARK
+          ================================================== */}
+
+          <div className="certificate-watermark">
+            eSPARKS
           </div>
 
-        </section>
+          <div className="certificate-watermark-sub">
+            CERTIFICATE • VERIFIED
+          </div>
 
-      </main>
+          {/* =================================================
+              DECORATIVE CORNERS
+          ================================================== */}
 
+          <div className="certificate-corner certificate-corner-tl">
+            <span></span>
+          </div>
+
+          <div className="certificate-corner certificate-corner-tr">
+            <span></span>
+          </div>
+
+          <div className="certificate-corner certificate-corner-bl">
+            <span></span>
+          </div>
+
+          <div className="certificate-corner certificate-corner-br">
+            <span></span>
+          </div>
+
+          {/* =================================================
+              GOLD RIBBONS
+          ================================================== */}
+
+          <div className="certificate-ribbon certificate-ribbon-tl"></div>
+
+          <div className="certificate-ribbon certificate-ribbon-br"></div>
+
+          {/* =================================================
+              BORDERS
+          ================================================== */}
+
+          <div className="certificate-outer-border"></div>
+
+          <div className="certificate-gold-border"></div>
+
+          <div className="certificate-inner-border"></div>
+
+          {/* =================================================
+              SECURITY PATTERN
+          ================================================== */}
+
+          <div className="certificate-security-pattern">
+            <span>eSparks</span>
+            <span>eSparks</span>
+            <span>eSparks</span>
+            <span>eSparks</span>
+            <span>eSparks</span>
+            <span>eSparks</span>
+          </div>
+
+          {/* =================================================
+              HEADER
+          ================================================== */}
+
+          <header className="certificate-header">
+
+            {/* COMPANY BRAND */}
+
+            <div className="certificate-brand">
+
+              <img
+                src={companyLogo}
+                alt="eSparks IT Solutions"
+                className="certificate-logo"
+              />
+
+          
+            </div>
+
+            {/* =================================================
+                QR CODE
+            ================================================== */}
+
+            <div className="certificate-qr-section">
+
+              {verificationUrl ? (
+                <>
+                  <div className="certificate-qr-box">
+
+                    <QRCodeSVG
+                      value={verificationUrl}
+                      size={112}
+                      bgColor="#ffffff"
+                      fgColor="#09284f"
+                      level="H"
+                      includeMargin={false}
+                    />
+
+                  </div>
+
+                  <div className="certificate-qr-title">
+                    SCAN TO VERIFY
+                  </div>
+
+                  <div className="certificate-qr-subtitle">
+                    Certificate authenticity
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="certificate-qr-box certificate-qr-unavailable">
+                    <AlertCircle
+                      size={28}
+                    />
+
+                    <span>
+                      QR unavailable
+                    </span>
+                  </div>
+
+                  <div className="certificate-qr-title">
+                    VERIFICATION UNAVAILABLE
+                  </div>
+                </>
+              )}
+
+            </div>
+
+          </header>
+
+          {/* =================================================
+              TITLE
+          ================================================== */}
+
+          <section className="certificate-title-section">
+
+            <p className="certificate-title-small">
+              CERTIFICATE OF
+            </p>
+
+            <h1>
+              COMPLETION
+            </h1>
+
+            <div className="certificate-title-decoration">
+
+              <span></span>
+
+              <i>
+                ◆
+              </i>
+
+              <span></span>
+
+            </div>
+
+          </section>
+
+          {/* =================================================
+              MAIN CONTENT
+          ================================================== */}
+
+          <main className="certificate-main-content">
+
+            <p className="certificate-presented">
+              This certificate is proudly presented to
+            </p>
+
+            <h2 className="certificate-recipient">
+              {toTitleCase(recipientName)}
+            </h2>
+
+            <div className="certificate-recipient-line"></div>
+
+            <p className="certificate-completion">
+              for successfully completing the
+            </p>
+
+            <h3 className="certificate-course">
+              {courseName}
+            </h3>
+
+            <p className="certificate-description">
+              This certificate recognizes the successful
+              completion of the program and acknowledges
+              the dedication, effort and commitment
+              demonstrated by the recipient.
+            </p>
+
+          </main>
+
+          {/* =================================================
+              SIDE DECORATION
+          ================================================== */}
+
+          <div className="certificate-side-decoration certificate-side-left">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+
+          <div className="certificate-side-decoration certificate-side-right">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+
+          {/* =================================================
+              BOTTOM INFORMATION
+          ================================================== */}
+
+          <section className="certificate-bottom">
+
+            {/* DATE */}
+
+            <div className="certificate-bottom-item">
+
+              <div className="certificate-bottom-icon">
+                ◫
+              </div>
+
+              <div className="certificate-bottom-label">
+                DATE OF ISSUE
+              </div>
+
+              <div className="certificate-bottom-value">
+                {issueDate}
+              </div>
+
+              <div className="certificate-bottom-line"></div>
+
+            </div>
+
+            {/* CERTIFICATE NUMBER */}
+
+            <div className="certificate-bottom-item">
+
+              <div className="certificate-bottom-icon">
+                ▤
+              </div>
+
+              <div className="certificate-bottom-label">
+                CERTIFICATE NO.
+              </div>
+
+              <div className="certificate-bottom-value certificate-number">
+                {certificateNo}
+              </div>
+
+              <div className="certificate-bottom-line"></div>
+
+            </div>
+
+            {/* =================================================
+                SEAL
+            ================================================== */}
+
+            <div className="certificate-seal-wrapper">
+
+              <div className="certificate-seal">
+
+                <div className="certificate-seal-inner">
+
+                  <div className="seal-stars">
+                    ★ ★ ★
+                  </div>
+
+                  <div className="seal-logo">
+                    e
+                  </div>
+
+                  <strong>
+                    eSPARKS
+                  </strong>
+
+                  <small>
+                    IT SOLUTIONS
+                  </small>
+
+                  <div className="seal-certified">
+                    CERTIFIED
+                  </div>
+
+                  <div className="seal-stars-bottom">
+                    ★ ★ ★
+                  </div>
+
+                </div>
+
+              </div>
+
+              <div className="seal-ribbon">
+                <span></span>
+                <span></span>
+              </div>
+
+            </div>
+
+            {/* =================================================
+                SIGNATURE
+            ================================================== */}
+
+            <div className="certificate-signature">
+
+                <img
+                            src={sign}
+                            alt="eSparks IT Solutions"
+                            className="certificate-logo "
+                          />
+              <div className="signature-line"></div>
+
+              <div className="signature-title">
+                Authorized Signatory
+              </div>
+
+              <div className="signature-company">
+                {issuerName}
+              </div>
+
+            </div>
+
+          </section>
+
+          {/* =================================================
+              FOOTER
+          ================================================== */}
+
+          <footer className="certificate-footer">
+
+            <div className="certificate-footer-icon">
+              ✓
+            </div>
+
+            <div className="certificate-footer-content">
+
+              <strong>
+                Digitally Verifiable Certificate
+              </strong>
+
+              <span>
+                Scan the QR code to verify authenticity.
+              </span>
+
+            </div>
+
+            <div className="certificate-footer-number">
+              {certificateNo}
+            </div>
+
+          </footer>
+
+          {/* =================================================
+              REVOKED OVERLAY
+          ================================================== */}
+
+          {!isIssued && (
+            <div className="certificate-revoked-overlay">
+
+              <div className="certificate-revoked-badge">
+
+                <AlertCircle size={22} />
+
+                CERTIFICATE REVOKED
+
+              </div>
+
+            </div>
+          )}
+
+        </div>
+      </div>
     </div>
-
   );
-}
+};
+
+export default CertificateView;

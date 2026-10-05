@@ -5,6 +5,9 @@ const rateLimit = require("express-rate-limit");
 
 const pool = require("../db");
 
+const isProduction =
+  process.env.NODE_ENV === "production";
+
 const {
   requireTrustedOrigin,
 } = require("./auth");
@@ -15,11 +18,14 @@ const router = express.Router();
 // CONFIG
 // =====================================================
 
-const COOKIE_NAME = "certificate_employee_session";
+const COOKIE_NAME =
+  "certificate_employee_session";
 
-const JWT_ISSUER = "certificate-api";
+const JWT_ISSUER =
+  "certificate-api";
 
-const JWT_AUDIENCE = "certificate-employee";
+const JWT_AUDIENCE =
+  "certificate-employee";
 
 const SESSION_MINUTES = 15;
 
@@ -65,13 +71,36 @@ function getJwtSecret() {
 }
 
 // =====================================================
-// EMAIL
+// EMAIL NORMALIZATION
 // =====================================================
 
 function normalizeEmail(email) {
   return String(email || "")
     .trim()
     .toLowerCase();
+}
+
+// =====================================================
+// COMPANY EMAIL VALIDATION
+// =====================================================
+//
+// Only emails ending with @esparksit.com are allowed.
+//
+// Examples:
+//
+// ✅ nsujalkant@gmail.com
+//
+//
+// ❌ sujal@gmail.com
+// ❌ user@esparksit.in
+// ❌ user@esparksit.com.fake.com
+//
+// =====================================================
+
+function isCompanyEmail(email) {
+  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@esparksit\.com$/i.test(
+    email
+  );
 }
 
 // =====================================================
@@ -105,20 +134,28 @@ function setSessionCookie(res, employee) {
     }
   );
 
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
+  res.cookie(
+    COOKIE_NAME,
+    token,
+    {
+      httpOnly: true,
 
-    // Required because the frontend/backend
-    // are running on HTTPS Dev Tunnel domains.
-    secure: true,
+      secure:
+        isProduction,
 
-    // Required for cross-site requests.
-    sameSite: "none",
+      sameSite:
+        isProduction
+          ? "none"
+          : "lax",
 
-    path: "/",
+      path: "/",
 
-    maxAge: SESSION_MINUTES * 60 * 1000,
-  });
+      maxAge:
+        SESSION_MINUTES *
+        60 *
+        1000,
+    }
+  );
 }
 
 // =====================================================
@@ -126,17 +163,22 @@ function setSessionCookie(res, employee) {
 // =====================================================
 
 function clearSessionCookie(res) {
-  res.clearCookie(COOKIE_NAME, {
-    httpOnly: true,
+  res.clearCookie(
+    COOKIE_NAME,
+    {
+      httpOnly: true,
 
-    // Must match the cookie settings.
-    secure: true,
+      secure:
+        isProduction,
 
-    // Must match the cookie settings.
-    sameSite: "none",
+      sameSite:
+        isProduction
+          ? "none"
+          : "lax",
 
-    path: "/",
-  });
+      path: "/",
+    }
+  );
 }
 
 // =====================================================
@@ -147,7 +189,10 @@ function validPassword(password) {
   return (
     typeof password === "string" &&
     password.length >= 10 &&
-    Buffer.byteLength(password, "utf8") <= 72
+    Buffer.byteLength(
+      password,
+      "utf8"
+    ) <= 72
   );
 }
 
@@ -175,21 +220,26 @@ router.post(
       // EMAIL
       // ---------------------------------------------
 
-      const email = normalizeEmail(
-        req.body?.email
-      );
+      const email =
+        normalizeEmail(
+          req.body?.email
+        );
 
       // ---------------------------------------------
       // PASSWORD
       // ---------------------------------------------
 
-      const password = req.body?.password;
+      const password =
+        req.body?.password;
 
       // ---------------------------------------------
       // NAME VALIDATION
       // ---------------------------------------------
 
-      if (!name || name.length > 100) {
+      if (
+        !name ||
+        name.length > 100
+      ) {
         return res.status(400).json({
           message:
             "Name is required and must be at most 100 characters.",
@@ -197,13 +247,15 @@ router.post(
       }
 
       // ---------------------------------------------
-      // EMAIL VALIDATION
+      // BASIC EMAIL VALIDATION
       // ---------------------------------------------
 
       if (
         !email ||
         email.length > 254 ||
-        !/^[^\s@]+@[^\s@]+$/.test(email)
+        !/^[^\s@]+@[^\s@]+$/.test(
+          email
+        )
       ) {
         return res.status(400).json({
           message:
@@ -212,10 +264,25 @@ router.post(
       }
 
       // ---------------------------------------------
+      // COMPANY EMAIL VALIDATION
+      // ---------------------------------------------
+
+      if (
+        !isCompanyEmail(email)
+      ) {
+        return res.status(403).json({
+          message:
+            "Only eSparks IT Solutions company email addresses are allowed.",
+        });
+      }
+
+      // ---------------------------------------------
       // PASSWORD VALIDATION
       // ---------------------------------------------
 
-      if (!validPassword(password)) {
+      if (
+        !validPassword(password)
+      ) {
         return res.status(400).json({
           message:
             "Password must be at least 10 characters and no more than 72 UTF-8 bytes.",
@@ -226,42 +293,45 @@ router.post(
       // HASH PASSWORD
       // ---------------------------------------------
 
-      const passwordHash = await bcrypt.hash(
-        password,
-        12
-      );
+      const passwordHash =
+        await bcrypt.hash(
+          password,
+          12
+        );
 
       // ---------------------------------------------
       // INSERT EMPLOYEE
       // ---------------------------------------------
 
-      const result = await pool.query(
-        `
-        INSERT INTO employee_users
-        (
-          name,
-          email,
-          password_hash
-        )
-        VALUES
-        (
-          $1,
-          $2,
-          $3
-        )
-        RETURNING
-          id,
-          name,
-          email
-        `,
-        [
-          name,
-          email,
-          passwordHash,
-        ]
-      );
+      const result =
+        await pool.query(
+          `
+          INSERT INTO employee_users
+          (
+            name,
+            email,
+            password_hash
+          )
+          VALUES
+          (
+            $1,
+            $2,
+            $3
+          )
+          RETURNING
+            id,
+            name,
+            email
+          `,
+          [
+            name,
+            email,
+            passwordHash,
+          ]
+        );
 
-      const employee = result.rows[0];
+      const employee =
+        result.rows[0];
 
       // ---------------------------------------------
       // CREATE SESSION
@@ -281,13 +351,20 @@ router.post(
           "Employee registered successfully.",
 
         employee:
-          publicEmployee(employee),
+          publicEmployee(
+            employee
+          ),
       });
 
     } catch (error) {
 
-      // Duplicate email
-      if (error.code === "23505") {
+      // ---------------------------------------------
+      // DUPLICATE EMAIL
+      // ---------------------------------------------
+
+      if (
+        error.code === "23505"
+      ) {
         return res.status(409).json({
           message:
             "An account with this email already exists.",
@@ -314,15 +391,17 @@ router.post(
       // EMAIL
       // ---------------------------------------------
 
-      const email = normalizeEmail(
-        req.body?.email
-      );
+      const email =
+        normalizeEmail(
+          req.body?.email
+        );
 
       // ---------------------------------------------
       // PASSWORD
       // ---------------------------------------------
 
-      const password = req.body?.password;
+      const password =
+        req.body?.password;
 
       // ---------------------------------------------
       // BASIC VALIDATION
@@ -330,7 +409,8 @@ router.post(
 
       if (
         !email ||
-        typeof password !== "string"
+        typeof password !==
+          "string"
       ) {
         return res.status(400).json({
           message:
@@ -342,22 +422,24 @@ router.post(
       // FIND EMPLOYEE
       // ---------------------------------------------
 
-      const result = await pool.query(
-        `
-        SELECT
-          id,
-          name,
-          email,
-          password_hash,
-          is_active
-        FROM employee_users
-        WHERE LOWER(email) = $1
-        LIMIT 1
-        `,
-        [email]
-      );
+      const result =
+        await pool.query(
+          `
+          SELECT
+            id,
+            name,
+            email,
+            password_hash,
+            is_active
+          FROM employee_users
+          WHERE LOWER(email) = $1
+          LIMIT 1
+          `,
+          [email]
+        );
 
-      const employee = result.rows[0];
+      const employee =
+        result.rows[0];
 
       // ---------------------------------------------
       // VERIFY LOGIN
@@ -387,7 +469,8 @@ router.post(
         `
         UPDATE employee_users
         SET
-          last_login_at = CURRENT_TIMESTAMP
+          last_login_at =
+            CURRENT_TIMESTAMP
         WHERE id = $1
         `,
         [employee.id]
@@ -411,7 +494,9 @@ router.post(
           "Employee login successful.",
 
         employee:
-          publicEmployee(employee),
+          publicEmployee(
+            employee
+          ),
       });
 
     } catch (error) {
@@ -434,7 +519,9 @@ router.get(
       // ---------------------------------------------
 
       const token =
-        req.cookies?.[COOKIE_NAME];
+        req.cookies?.[
+          COOKIE_NAME
+        ];
 
       // ---------------------------------------------
       // NO COOKIE
@@ -454,16 +541,21 @@ router.get(
       let payload;
 
       try {
-        payload = jwt.verify(
-          token,
-          getJwtSecret(),
-          {
-            issuer: JWT_ISSUER,
-            audience: JWT_AUDIENCE,
-          }
-        );
+        payload =
+          jwt.verify(
+            token,
+            getJwtSecret(),
+            {
+              issuer:
+                JWT_ISSUER,
+              audience:
+                JWT_AUDIENCE,
+            }
+          );
       } catch {
-        clearSessionCookie(res);
+        clearSessionCookie(
+          res
+        );
 
         return res.status(401).json({
           message:
@@ -476,10 +568,13 @@ router.get(
       // ---------------------------------------------
 
       if (
-        payload.role !== "employee" ||
+        payload.role !==
+          "employee" ||
         !payload.sub
       ) {
-        clearSessionCookie(res);
+        clearSessionCookie(
+          res
+        );
 
         return res.status(401).json({
           message:
@@ -491,27 +586,33 @@ router.get(
       // FIND ACTIVE EMPLOYEE
       // ---------------------------------------------
 
-      const result = await pool.query(
-        `
-        SELECT
-          id,
-          name,
-          email
-        FROM employee_users
-        WHERE
-          id = $1
-          AND is_active = TRUE
-        LIMIT 1
-        `,
-        [payload.sub]
-      );
+      const result =
+        await pool.query(
+          `
+          SELECT
+            id,
+            name,
+            email
+          FROM employee_users
+          WHERE
+            id = $1
+            AND is_active = TRUE
+          LIMIT 1
+          `,
+          [payload.sub]
+        );
 
       // ---------------------------------------------
       // EMPLOYEE NOT FOUND
       // ---------------------------------------------
 
-      if (result.rows.length === 0) {
-        clearSessionCookie(res);
+      if (
+        result.rows.length ===
+        0
+      ) {
+        clearSessionCookie(
+          res
+        );
 
         return res.status(401).json({
           message:
@@ -545,8 +646,9 @@ router.post(
   "/logout",
   requireTrustedOrigin,
   (req, res) => {
-
-    clearSessionCookie(res);
+    clearSessionCookie(
+      res
+    );
 
     return res.json({
       message:
@@ -570,7 +672,9 @@ async function requireEmployee(
     // ---------------------------------------------
 
     const token =
-      req.cookies?.[COOKIE_NAME];
+      req.cookies?.[
+        COOKIE_NAME
+      ];
 
     // ---------------------------------------------
     // NO COOKIE
@@ -590,16 +694,21 @@ async function requireEmployee(
     let payload;
 
     try {
-      payload = jwt.verify(
-        token,
-        getJwtSecret(),
-        {
-          issuer: JWT_ISSUER,
-          audience: JWT_AUDIENCE,
-        }
-      );
+      payload =
+        jwt.verify(
+          token,
+          getJwtSecret(),
+          {
+            issuer:
+              JWT_ISSUER,
+            audience:
+              JWT_AUDIENCE,
+          }
+        );
     } catch {
-      clearSessionCookie(res);
+      clearSessionCookie(
+        res
+      );
 
       return res.status(401).json({
         message:
@@ -612,7 +721,8 @@ async function requireEmployee(
     // ---------------------------------------------
 
     if (
-      payload.role !== "employee" ||
+      payload.role !==
+        "employee" ||
       !payload.sub
     ) {
       return res.status(403).json({
@@ -625,27 +735,33 @@ async function requireEmployee(
     // FIND ACTIVE EMPLOYEE
     // ---------------------------------------------
 
-    const result = await pool.query(
-      `
-      SELECT
-        id,
-        name,
-        email
-      FROM employee_users
-      WHERE
-        id = $1
-        AND is_active = TRUE
-      LIMIT 1
-      `,
-      [payload.sub]
-    );
+    const result =
+      await pool.query(
+        `
+        SELECT
+          id,
+          name,
+          email
+        FROM employee_users
+        WHERE
+          id = $1
+          AND is_active = TRUE
+        LIMIT 1
+        `,
+        [payload.sub]
+      );
 
     // ---------------------------------------------
     // EMPLOYEE NOT FOUND
     // ---------------------------------------------
 
-    if (result.rows.length === 0) {
-      clearSessionCookie(res);
+    if (
+      result.rows.length ===
+      0
+    ) {
+      clearSessionCookie(
+        res
+      );
 
       return res.status(401).json({
         message:

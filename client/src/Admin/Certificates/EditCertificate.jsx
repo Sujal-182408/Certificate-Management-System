@@ -4,7 +4,7 @@ import { ArrowLeft, Save, FilePenLine } from "lucide-react";
 import BackButton from "../../components/BackButton";
 import "./EditCertificate.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "/api";
 
 export default function EditCertificate() {
   const { id } = useParams();
@@ -13,20 +13,25 @@ export default function EditCertificate() {
   const [form, setForm] = useState({
     certificateNo: "",
     recipientName: "",
+    employeeId: "",
+    employeeEmail: "",
     courseName: "",
     issuerName: "",
     issueDate: "",
-    status: "issued",
   });
+
+  const [certificateStatus, setCertificateStatus] =
+    useState("issued");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  /* =========================
+  /* =========================================================
      FETCH CERTIFICATE
-  ========================= */
+  ========================================================= */
 
   useEffect(() => {
     const fetchCertificate = async () => {
@@ -37,128 +42,288 @@ export default function EditCertificate() {
         const response = await fetch(
           `${API_URL}/admin/certificates/${id}`,
           {
+            method: "GET",
             credentials: "include",
+            headers: {
+              Accept: "application/json",
+            },
           }
         );
 
-        const data = await response.json();
+        const data = await response
+          .json()
+          .catch(() => ({}));
 
         if (!response.ok) {
           throw new Error(
-            data?.message || "Failed to load certificate."
+            data?.message ||
+              "Failed to load certificate."
           );
         }
 
-        const certificate = data.certificate || data;
+        const certificate =
+          data?.certificate || data;
+
+        if (!certificate) {
+          throw new Error(
+            "Certificate information was not found."
+          );
+        }
+
+        /*
+         * IMPORTANT:
+         * employee_id comes from PostgreSQL.
+         * We don't allow the admin to manually type
+         * recipient information.
+         */
 
         setForm({
-          certificateNo: certificate.certificate_no || "",
-          recipientName: certificate.recipient_name || "",
-          courseName: certificate.course_name || "",
-          issuerName: certificate.issuer_name || "",
+          certificateNo:
+            certificate.certificate_no || "",
+
+          recipientName:
+            certificate.recipient_name || "",
+
+          employeeId:
+            certificate.employee_id
+              ? String(certificate.employee_id)
+              : "",
+
+          employeeEmail:
+            certificate.employee_email || "",
+
+          courseName:
+            certificate.course_name || "",
+
+          issuerName:
+            certificate.issuer_name || "",
+
           issueDate: certificate.issue_date
-            ? certificate.issue_date.substring(0, 10)
+            ? String(certificate.issue_date).substring(
+                0,
+                10
+              )
             : "",
-          status: certificate.status || "issued",
         });
+
+        setCertificateStatus(
+          certificate.status || "issued"
+        );
       } catch (err) {
-        setError(err.message);
+        console.error(
+          "Fetch certificate error:",
+          err
+        );
+
+        setError(
+          err?.message ||
+            "Unable to load certificate."
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCertificate();
+    if (id) {
+      fetchCertificate();
+    }
   }, [id]);
 
-  /* =========================
+  /* =========================================================
      HANDLE INPUT
-  ========================= */
+  ========================================================= */
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setForm((prev) => ({
-      ...prev,
+    setForm((previous) => ({
+      ...previous,
       [name]: value,
     }));
 
-    setSuccess("");
     setError("");
+    setSuccess("");
   };
 
-  /* =========================
+  /* =========================================================
+     VALIDATION
+  ========================================================= */
+
+  const validateForm = () => {
+    if (!form.certificateNo.trim()) {
+      return "Certificate number is required.";
+    }
+
+    if (!form.employeeId) {
+      return (
+        "This certificate is not linked to a registered employee."
+      );
+    }
+
+    if (!form.courseName.trim()) {
+      return "Course name is required.";
+    }
+
+    if (!form.issuerName.trim()) {
+      return "Issuer name is required.";
+    }
+
+    if (!form.issueDate) {
+      return "Issue date is required.";
+    }
+
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        form.issueDate
+      )
+    ) {
+      return "Issue date must be in YYYY-MM-DD format.";
+    }
+
+    return null;
+  };
+
+  /* =========================================================
      SAVE
-  ========================= */
+  ========================================================= */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const validationError =
+      validateForm();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
       setSaving(true);
       setError("");
       setSuccess("");
 
+      /*
+       * Do NOT send status.
+       *
+       * Revocation has its own endpoint:
+       * PATCH /api/admin/certificates/:id/revoke
+       */
+
+      const payload = {
+        certificateNo:
+          form.certificateNo.trim(),
+
+        recipientName:
+          form.recipientName.trim(),
+
+        courseName:
+          form.courseName.trim(),
+
+        issuerName:
+          form.issuerName.trim(),
+
+        issueDate:
+          form.issueDate,
+
+        employeeId:
+          Number(form.employeeId),
+      };
+
+      console.log(
+        "Updating certificate:",
+        payload
+      );
+
       const response = await fetch(
         `${API_URL}/admin/certificates/${id}`,
         {
           method: "PUT",
 
-          headers: {
-            "Content-Type": "application/json",
-          },
-
           credentials: "include",
 
-          body: JSON.stringify(form),
+          headers: {
+            "Content-Type":
+              "application/json",
+            Accept: "application/json",
+          },
+
+          body: JSON.stringify(payload),
         }
       );
 
-      const data = await response.json();
+      const data = await response
+        .json()
+        .catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
-          data?.message || "Failed to update certificate."
+          data?.message ||
+            "Failed to update certificate."
         );
       }
 
-      setSuccess("Certificate updated successfully.");
+      setSuccess(
+        data?.message ||
+          "Certificate updated successfully."
+      );
+
+      /*
+       * Give the user a moment to see
+       * the success message.
+       */
 
       setTimeout(() => {
-        navigate(`/admin/certificates/${id}`);
-      }, 800);
+        navigate(
+          `/admin/certificates/${id}`
+        );
+      }, 900);
     } catch (err) {
-      setError(err.message);
+      console.error(
+        "Update certificate error:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to update certificate."
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  /* =========================
+  /* =========================================================
      LOADING
-  ========================= */
+  ========================================================= */
 
   if (loading) {
     return (
       <div className="edit-certificate-page">
         <div className="edit-loading">
-          Loading certificate...
+          <div className="edit-loading-spinner"></div>
+
+          <p>
+            Loading certificate...
+          </p>
         </div>
       </div>
     );
   }
 
-  /* =========================
+  /* =========================================================
      PAGE
-  ========================= */
+  ========================================================= */
 
   return (
     <div className="edit-certificate-page">
 
-<BackButton
-  text="Back to Certificates"
-  to="/admin/certificates"
-/>
+      {/* BACK */}
+
+      <BackButton
+        text="Back to Certificates"
+        to="/admin/certificates"
+      />
 
       {/* SUCCESS */}
 
@@ -176,7 +341,9 @@ export default function EditCertificate() {
         </div>
       )}
 
-      {/* TOP BAR */}
+      {/* =====================================================
+          TOP BAR
+      ===================================================== */}
 
       <div className="edit-certificate-topbar">
 
@@ -187,7 +354,9 @@ export default function EditCertificate() {
           </div>
 
           <div>
-            <h1>Edit Certificate</h1>
+            <h1>
+              Edit Certificate
+            </h1>
 
             <p>
               Update certificate information
@@ -200,23 +369,27 @@ export default function EditCertificate() {
           type="button"
           className="edit-back-btn"
           onClick={() =>
-            navigate("/admin/certificates")
+            navigate(
+              "/admin/certificates"
+            )
           }
         >
           <ArrowLeft size={16} />
+
           Back to Certificates
         </button>
 
       </div>
 
-
-      {/* MAIN */}
+      {/* =====================================================
+          MAIN LAYOUT
+      ===================================================== */}
 
       <div className="edit-certificate-layout">
 
-        {/* =========================
+        {/* ===================================================
             FORM
-        ========================= */}
+        =================================================== */}
 
         <div className="edit-certificate-card">
 
@@ -227,120 +400,165 @@ export default function EditCertificate() {
             </h2>
 
             <p>
-              Modify the information below.
+              Modify the certificate information below.
             </p>
 
           </div>
-
 
           <form
             className="edit-certificate-form"
             onSubmit={handleSubmit}
           >
 
-            {/* CERTIFICATE NUMBER */}
+            {/* =============================================
+                CERTIFICATE NUMBER
+            ============================================= */}
 
             <div className="edit-form-group">
 
               <label>
                 Certificate Number
-                <span className="required">*</span>
+                <span className="required">
+                  *
+                </span>
               </label>
 
               <input
                 type="text"
                 name="certificateNo"
-                value={form.certificateNo}
+                value={
+                  form.certificateNo
+                }
                 onChange={handleChange}
                 required
+                disabled={saving}
+                maxLength={100}
+                autoComplete="off"
               />
 
               <span className="field-help">
-                Unique certificate identification number.
+                Must be unique.
               </span>
 
             </div>
 
-
-            {/* RECIPIENT */}
+            {/* =============================================
+                EMPLOYEE
+            ============================================= */}
 
             <div className="edit-form-group">
 
               <label>
-                Recipient Name
-                <span className="required">*</span>
+                Registered Employee
               </label>
 
-              <input
-                type="text"
-                name="recipientName"
-                value={form.recipientName}
-                onChange={handleChange}
-                required
-              />
+              <div className="edit-employee-box">
+
+                <div>
+                  <strong>
+                    {form.recipientName ||
+                      "Unknown employee"}
+                  </strong>
+
+                  <span>
+                    {form.employeeEmail ||
+                      "No employee email"}
+                  </span>
+                </div>
+
+              </div>
+
+              <span className="field-help">
+                Employee identity is linked to the
+                registered employee account and cannot
+                be changed here.
+              </span>
 
             </div>
 
-
-            {/* COURSE */}
+            {/* =============================================
+                COURSE
+            ============================================= */}
 
             <div className="edit-form-group">
 
               <label>
                 Course Name
-                <span className="required">*</span>
+                <span className="required">
+                  *
+                </span>
               </label>
 
               <input
                 type="text"
                 name="courseName"
-                value={form.courseName}
+                value={
+                  form.courseName
+                }
                 onChange={handleChange}
                 required
+                disabled={saving}
+                maxLength={200}
               />
 
             </div>
 
-
-            {/* ISSUER */}
+            {/* =============================================
+                ISSUER
+            ============================================= */}
 
             <div className="edit-form-group">
 
               <label>
                 Issuer
-                <span className="required">*</span>
+                <span className="required">
+                  *
+                </span>
               </label>
 
               <input
                 type="text"
                 name="issuerName"
-                value={form.issuerName}
+                value={
+                  form.issuerName
+                }
                 onChange={handleChange}
                 required
+                disabled={saving}
+                maxLength={200}
               />
 
             </div>
 
-
-            {/* DATE */}
+            {/* =============================================
+                ISSUE DATE
+            ============================================= */}
 
             <div className="edit-form-group">
 
               <label>
                 Issue Date
+                <span className="required">
+                  *
+                </span>
               </label>
 
               <input
                 type="date"
                 name="issueDate"
-                value={form.issueDate}
+                value={
+                  form.issueDate
+                }
                 onChange={handleChange}
+                required
+                disabled={saving}
               />
 
             </div>
 
-
-            {/* STATUS */}
+            {/* =============================================
+                STATUS
+            ============================================= */}
 
             <div className="edit-form-group">
 
@@ -348,31 +566,38 @@ export default function EditCertificate() {
                 Certificate Status
               </label>
 
-              <select
-                name="status"
-                value={form.status}
-                onChange={handleChange}
+              <div
+                className={`edit-status-display ${
+                  certificateStatus ===
+                  "revoked"
+                    ? "revoked"
+                    : "issued"
+                }`}
               >
+                <span className="edit-status-dot"></span>
 
-                <option value="issued">
-                  Issued
-                </option>
+                {certificateStatus ===
+                "revoked"
+                  ? "Revoked"
+                  : "Issued"}
+              </div>
 
-                <option value="revoked">
-                  Revoked
-                </option>
-
-              </select>
+              <span className="field-help">
+                Certificate status is controlled by
+                the dedicated revoke action.
+              </span>
 
             </div>
 
-
-            {/* FOOTER */}
+            {/* =============================================
+                FOOTER
+            ============================================= */}
 
             <div className="edit-form-footer">
 
               <div className="edit-footer-info">
-                Changes will update the existing certificate.
+                Changes will update the existing
+                certificate.
               </div>
 
               <div className="edit-footer-buttons">
@@ -381,7 +606,9 @@ export default function EditCertificate() {
                   type="button"
                   className="cancel-edit-btn"
                   onClick={() =>
-                    navigate("/admin/certificates")
+                    navigate(
+                      "/admin/certificates"
+                    )
                   }
                   disabled={saving}
                 >
@@ -391,15 +618,17 @@ export default function EditCertificate() {
                 <button
                   type="submit"
                   className="save-edit-btn"
-                  disabled={saving}
+                  disabled={
+                    saving ||
+                    certificateStatus ===
+                      "revoked"
+                  }
                 >
-
                   <Save size={16} />
 
                   {saving
                     ? "Saving..."
                     : "Save Changes"}
-
                 </button>
 
               </div>
@@ -407,13 +636,11 @@ export default function EditCertificate() {
             </div>
 
           </form>
-
         </div>
 
-
-        {/* =========================
+        {/* ===================================================
             SIDEBAR
-        ========================= */}
+        =================================================== */}
 
         <aside className="edit-sidebar">
 
@@ -432,71 +659,124 @@ export default function EditCertificate() {
               </span>
 
               <div className="preview-value">
-                {form.certificateNo || "-"}
+                {form.certificateNo ||
+                  "-"}
               </div>
-
 
               <span className="preview-label">
                 Recipient
               </span>
 
               <div className="preview-value preview-recipient">
-                {form.recipientName || "-"}
+                {form.recipientName ||
+                  "-"}
               </div>
 
+              <span className="preview-label">
+                Employee Gmail
+              </span>
+
+              <div className="preview-value preview-email">
+                {form.employeeEmail ||
+                  "-"}
+              </div>
 
               <span className="preview-label">
                 Course
               </span>
 
               <div className="preview-value">
-                {form.courseName || "-"}
+                {form.courseName ||
+                  "-"}
               </div>
-
 
               <span className="preview-label">
                 Issuer
               </span>
 
               <div className="preview-value">
-                {form.issuerName || "-"}
+                {form.issuerName ||
+                  "-"}
               </div>
 
+              <span className="preview-label">
+                Issue Date
+              </span>
+
+              <div className="preview-value">
+                {form.issueDate ||
+                  "-"}
+              </div>
 
               <span
                 className={`preview-status ${
-                  form.status === "issued"
+                  certificateStatus ===
+                  "issued"
                     ? "issued"
                     : "revoked"
                 }`}
               >
-                {form.status}
+                {certificateStatus}
               </span>
 
             </div>
 
           </div>
 
-
-          {/* WARNING */}
+          {/* SECURITY INFO */}
 
           <div className="edit-warning-card">
 
             <h3>
-              ⚠ Important
+              🔐 Certificate Security
             </h3>
 
             <p>
-              Make sure all certificate information
-              is correct before saving your changes.
+              The recipient and Gmail are taken
+              from the registered employee account.
+              They cannot be changed manually.
             </p>
 
           </div>
 
+          {/* REVOKE INFO */}
+
+          {certificateStatus ===
+            "issued" && (
+            <div className="edit-warning-card">
+
+              <h3>
+                ⚠ Revocation
+              </h3>
+
+              <p>
+                To revoke this certificate, return
+                to Manage Certificates and use the
+                dedicated Revoke button.
+              </p>
+
+            </div>
+          )}
+
+          {certificateStatus ===
+            "revoked" && (
+            <div className="edit-warning-card">
+
+              <h3>
+                🚫 Certificate Revoked
+              </h3>
+
+              <p>
+                This certificate has already been
+                revoked and cannot be edited.
+              </p>
+
+            </div>
+          )}
+
         </aside>
 
       </div>
-
     </div>
   );
 }

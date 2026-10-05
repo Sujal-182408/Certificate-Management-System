@@ -1,37 +1,33 @@
-
 const express = require("express");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const pool = require("../db");
 
 const router = express.Router();
 
-
 // =====================================================
 // CONFIG
 // =====================================================
 
-const ADMIN_COOKIE_NAME =
-  "certificate_admin_session";
-
-const ADMIN_JWT_ISSUER =
-  "certificate-api";
-
-const ADMIN_JWT_AUDIENCE =
-  "certificate-admin";
-
+const ADMIN_COOKIE_NAME = "certificate_admin_session";
+const ADMIN_JWT_ISSUER = "certificate-api";
+const ADMIN_JWT_AUDIENCE = "certificate-admin";
 const SESSION_MINUTES = 15;
 
+// =====================================================
+// ENVIRONMENT
+// =====================================================
+
+const isProduction =
+  process.env.NODE_ENV === "production";
 
 // =====================================================
 // JWT SECRET
 // =====================================================
 
 function getJwtSecret() {
-
-  const secret =
-    process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET;
 
   if (
     !secret ||
@@ -45,196 +41,135 @@ function getJwtSecret() {
   return secret;
 }
 
-
 // =====================================================
 // TRUSTED ORIGIN
 // =====================================================
 
-function requireTrustedOrigin(
-  req,
-  res,
-  next
-) {
-
+function requireTrustedOrigin(req, res, next) {
   try {
-
-    const origin =
-      req.get("origin");
-
-
-    // =================================================
-    // REQUESTS WITHOUT ORIGIN
-    // =================================================
-    // Postman / server-to-server requests may not
-    // send an Origin header.
-    // =================================================
+    const origin = req.get("origin");
 
     if (!origin) {
       return next();
     }
 
-
-    // =================================================
-    // TRUSTED FRONTEND ORIGINS
-    // =================================================
-
     const trustedOrigins = [
-
-      // Local Vite development
       "http://localhost:5173",
-
-      // Localhost alternative
       "http://127.0.0.1:5173",
 
-      // Current VS Code Dev Tunnel
-      "https://q8n7zrnv-5173.inc1.devtunnels.ms",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174",
 
+      "http://192.168.1.5:5174",
+
+      "https://q8n7zrnv-5173.inc1.devtunnels.ms",
     ];
 
+    if (process.env.CLIENT_URL) {
+      const clientUrl = process.env.CLIENT_URL
+        .trim()
+        .replace(/\/$/, "");
 
-    // =================================================
-    // ADD CLIENT_URL FROM .ENV
-    // =================================================
-
-    if (
-      process.env.CLIENT_URL
-    ) {
-
-      trustedOrigins.push(
-        process.env.CLIENT_URL
-          .replace(/\/$/, "")
-      );
-
+      if (
+        clientUrl &&
+        !trustedOrigins.includes(clientUrl)
+      ) {
+        trustedOrigins.push(clientUrl);
+      }
     }
 
+    const normalizedOrigin = origin
+      .trim()
+      .replace(/\/$/, "");
 
-    // =================================================
-    // NORMALIZE ORIGIN
-    // =================================================
+    console.log(
+      "🌐 Request Origin:",
+      normalizedOrigin
+    );
 
-    const normalizedOrigin =
-      origin.replace(/\/$/, "");
+    console.log(
+      "✅ Trusted Origins:",
+      trustedOrigins
+    );
 
-
-    // =================================================
-    // CHECK ORIGIN
-    // =================================================
-
-    const isTrusted =
-      trustedOrigins.includes(
+    if (
+      !trustedOrigins.includes(
+        normalizedOrigin
+      )
+    ) {
+      console.log(
+        "❌ UNTRUSTED ORIGIN:",
         normalizedOrigin
       );
 
-
-    // =================================================
-    // REJECT UNKNOWN ORIGIN
-    // =================================================
-
-    if (!isTrusted) {
-
-      console.log(
-        "❌ UNTRUSTED ORIGIN:",
-        origin
-      );
-
-      console.log(
-        "✅ TRUSTED ORIGINS:",
-        trustedOrigins
-      );
-
       return res.status(403).json({
-        message:
-          "Untrusted request origin.",
+        message: "Untrusted request origin.",
       });
-
     }
-
-
-    // =================================================
-    // TRUSTED
-    // =================================================
 
     console.log(
       "✅ TRUSTED ORIGIN:",
-      origin
+      normalizedOrigin
     );
 
     return next();
-
   } catch (error) {
-
     return next(error);
-
   }
-
 }
-
 
 // =====================================================
 // ADMIN AUTH MIDDLEWARE
 // =====================================================
 
-function requireAdmin(
-  req,
-  res,
-  next
-) {
-
+function requireAdmin(req, res, next) {
   try {
+    // =================================================
+    // READ ADMIN COOKIE
+    // =================================================
 
     const token =
-      req.cookies?.[
-        ADMIN_COOKIE_NAME
-      ];
+      req.cookies?.[ADMIN_COOKIE_NAME];
 
+    console.log(
+      "🔐 Admin cookie present:",
+      Boolean(token)
+    );
 
     // =================================================
     // NO COOKIE
     // =================================================
 
     if (!token) {
-
       return res.status(401).json({
         message:
           "Admin authentication required.",
       });
-
     }
-
 
     // =================================================
     // VERIFY JWT
     // =================================================
 
-    const decoded =
-      jwt.verify(
-        token,
-        getJwtSecret(),
-        {
-          issuer:
-            ADMIN_JWT_ISSUER,
-
-          audience:
-            ADMIN_JWT_AUDIENCE,
-        }
-      );
-
+    const decoded = jwt.verify(
+      token,
+      getJwtSecret(),
+      {
+        issuer: ADMIN_JWT_ISSUER,
+        audience: ADMIN_JWT_AUDIENCE,
+      }
+    );
 
     // =================================================
     // ROLE CHECK
     // =================================================
 
-    if (
-      decoded.role !== "admin"
-    ) {
-
+    if (decoded.role !== "admin") {
       return res.status(403).json({
         message:
           "Admin access required.",
       });
-
     }
-
 
     // =================================================
     // MAKE ADMIN AVAILABLE
@@ -242,26 +177,25 @@ function requireAdmin(
 
     req.admin = decoded;
 
-
-    return next();
-
-  } catch (error) {
-
-    console.error(
-      "Admin authentication error:",
-      error.message
+    console.log(
+      "✅ Admin authenticated:",
+      decoded.email
     );
 
+    return next();
+  } catch (error) {
+    console.error(
+      "❌ Admin authentication error:",
+      error.name,
+      error.message
+    );
 
     return res.status(401).json({
       message:
         "Invalid or expired admin session.",
     });
-
   }
-
 }
-
 
 // =====================================================
 // ADMIN LOGIN
@@ -271,124 +205,111 @@ function requireAdmin(
 router.post(
   "/login",
   requireTrustedOrigin,
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res, next) => {
     try {
-
-      // ===============================================
+      // =================================================
       // GET LOGIN DATA
-      // ===============================================
+      // =================================================
 
-      const email =
-        String(
-          req.body?.email || ""
-        )
-          .trim()
-          .toLowerCase();
-
+      const email = String(
+        req.body?.email || ""
+      )
+        .trim()
+        .toLowerCase();
 
       const password =
         req.body?.password;
 
-
-      // ===============================================
+      // =================================================
       // VALIDATION
-      // ===============================================
+      // =================================================
 
       if (
         !email ||
-        typeof password !==
-          "string"
+        typeof password !== "string"
       ) {
-
         return res.status(400).json({
           message:
             "Email and password are required.",
         });
-
       }
 
-
-      // ===============================================
+      // =================================================
       // FIND ADMIN
-      // ===============================================
+      // =================================================
 
-      const result =
-        await pool.query(
-          `
-          SELECT
-            id,
-            email,
-            password_hash,
-            role,
-            is_active
-          FROM admin_users
-          WHERE LOWER(email) = $1
-          LIMIT 1
-          `,
-          [email]
-        );
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          email,
+          password_hash,
+          role,
+          is_active
+        FROM admin_users
+        WHERE LOWER(email) = $1
+        LIMIT 1
+        `,
+        [email]
+      );
 
-
-      // ===============================================
+      // =================================================
       // ADMIN NOT FOUND
-      // ===============================================
+      // =================================================
 
-      if (
-        result.rows.length === 0
-      ) {
-
+      if (result.rows.length === 0) {
         return res.status(401).json({
           message:
             "Invalid email or password.",
         });
-
       }
-
 
       const admin =
         result.rows[0];
 
-
-      // ===============================================
+      // =================================================
       // ACTIVE CHECK
-      // ===============================================
+      // =================================================
 
-      if (
-        !admin.is_active
-      ) {
-
+      if (!admin.is_active) {
         return res.status(403).json({
           message:
             "Admin account is inactive.",
         });
-
       }
 
-
-      // ===============================================
+      // =================================================
       // ROLE CHECK
-      // ===============================================
+      // =================================================
 
-      if (
-        admin.role !== "admin"
-      ) {
-
+      if (admin.role !== "admin") {
         return res.status(403).json({
           message:
             "Admin access denied.",
         });
-
       }
 
+      // =================================================
+      // PASSWORD HASH CHECK
+      // =================================================
 
-      // ===============================================
+      if (
+        !admin.password_hash ||
+        typeof admin.password_hash !== "string"
+      ) {
+        console.error(
+          "Admin password hash is missing."
+        );
+
+        return res.status(500).json({
+          message:
+            "Admin password is not configured.",
+        });
+      }
+
+      // =================================================
       // PASSWORD CHECK
-      // ===============================================
+      // =================================================
 
       const passwordMatch =
         await bcrypt.compare(
@@ -396,62 +317,48 @@ router.post(
           admin.password_hash
         );
 
-
       if (!passwordMatch) {
-
         return res.status(401).json({
           message:
             "Invalid email or password.",
         });
-
       }
 
-
-      // ===============================================
+      // =================================================
       // CREATE JWT
-      // ===============================================
+      // =================================================
 
-      const token =
-        jwt.sign(
-          {
-            id: admin.id,
-            email: admin.email,
-            role: admin.role,
-          },
+      const token = jwt.sign(
+        {
+          id: admin.id,
+          email: admin.email,
+          role: admin.role,
+        },
+        getJwtSecret(),
+        {
+          expiresIn: `${SESSION_MINUTES}m`,
+          issuer: ADMIN_JWT_ISSUER,
+          audience: ADMIN_JWT_AUDIENCE,
+        }
+      );
 
-          getJwtSecret(),
-
-          {
-            expiresIn:
-              `${SESSION_MINUTES}m`,
-
-            issuer:
-              ADMIN_JWT_ISSUER,
-
-            audience:
-              ADMIN_JWT_AUDIENCE,
-          }
-        );
-
-
-      // ===============================================
+      // =================================================
       // UPDATE LAST LOGIN
-      // ===============================================
+      // =================================================
 
       await pool.query(
         `
         UPDATE admin_users
-        SET last_login_at =
-          CURRENT_TIMESTAMP
+        SET
+          last_login_at = CURRENT_TIMESTAMP
         WHERE id = $1
         `,
         [admin.id]
       );
 
-
-      // ===============================================
+      // =================================================
       // ADMIN SESSION COOKIE
-      // ===============================================
+      // =================================================
 
       res.cookie(
         ADMIN_COOKIE_NAME,
@@ -459,12 +366,13 @@ router.post(
         {
           httpOnly: true,
 
-          // HTTPS Dev Tunnel requires secure cookies
-          secure: true,
+          // HTTP localhost/LAN
+          secure: isProduction,
 
-          // Frontend and backend are different
-          // origins during Dev Tunnel testing
-          sameSite: "none",
+          // Same-origin through Vite proxy
+          sameSite: isProduction
+            ? "none"
+            : "lax",
 
           path: "/",
 
@@ -475,13 +383,16 @@ router.post(
         }
       );
 
+      console.log(
+        "✅ Admin login successful:",
+        admin.email
+      );
 
-      // ===============================================
-      // SUCCESS RESPONSE
-      // ===============================================
+      // =================================================
+      // SUCCESS
+      // =================================================
 
       return res.json({
-
         message:
           "Admin login successful.",
 
@@ -490,23 +401,17 @@ router.post(
           email: admin.email,
           role: admin.role,
         },
-
       });
-
     } catch (error) {
-
       console.error(
-        "Admin login error:",
+        "❌ Admin login error:",
         error
       );
 
       return next(error);
-
     }
-
   }
 );
-
 
 // =====================================================
 // ADMIN ME
@@ -516,89 +421,49 @@ router.post(
 router.get(
   "/me",
   requireAdmin,
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res, next) => {
     try {
+      const result = await pool.query(
+        `
+        SELECT
+          id,
+          email,
+          role,
+          is_active,
+          created_at,
+          last_login_at
+        FROM admin_users
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [req.admin.id]
+      );
 
-      // ===============================================
-      // GET ADMIN
-      // ===============================================
-
-      const result =
-        await pool.query(
-          `
-          SELECT
-            id,
-            email,
-            role,
-            is_active,
-            created_at,
-            last_login_at
-          FROM admin_users
-          WHERE id = $1
-          LIMIT 1
-          `,
-          [req.admin.id]
-        );
-
-
-      // ===============================================
-      // ADMIN NOT FOUND
-      // ===============================================
-
-      if (
-        result.rows.length === 0
-      ) {
-
+      if (result.rows.length === 0) {
         return res.status(401).json({
           message:
             "Admin account not found.",
         });
-
       }
-
 
       const admin =
         result.rows[0];
 
-
-      // ===============================================
-      // ACTIVE CHECK
-      // ===============================================
-
-      if (
-        !admin.is_active
-      ) {
-
+      if (!admin.is_active) {
         return res.status(403).json({
           message:
             "Admin account is inactive.",
         });
-
       }
-
-
-      // ===============================================
-      // SUCCESS
-      // ===============================================
 
       return res.json({
         admin,
       });
-
     } catch (error) {
-
       return next(error);
-
     }
-
   }
 );
-
 
 // =====================================================
 // ADMIN LOGOUT
@@ -609,29 +474,27 @@ router.post(
   "/logout",
   requireTrustedOrigin,
   (req, res) => {
-
     res.clearCookie(
       ADMIN_COOKIE_NAME,
       {
         httpOnly: true,
 
-        secure: true,
+        secure: isProduction,
 
-        sameSite: "none",
+        sameSite: isProduction
+          ? "none"
+          : "lax",
 
         path: "/",
       }
     );
 
-
     return res.json({
       message:
         "Admin logout successful.",
     });
-
   }
 );
-
 
 // =====================================================
 // EXPORTS

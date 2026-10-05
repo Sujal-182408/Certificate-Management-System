@@ -13,135 +13,313 @@ import QRScanner from "../components/QRScanner";
 import BackButton from "../components/BackButton";
 import { apiRequest } from "../services/api";
 
+// =====================================================
+// NORMALIZE CERTIFICATE
+// Backend may return snake_case.
+// Frontend uses camelCase.
+// =====================================================
+
+function normalizeCertificate(raw = {}) {
+  return {
+    id: raw.id ?? null,
+
+    certificateNo:
+      raw.certificateNo ??
+      raw.certificate_no ??
+      "",
+
+    recipientName:
+      raw.recipientName ??
+      raw.recipient_name ??
+      "",
+
+    courseName:
+      raw.courseName ??
+      raw.course_name ??
+      "",
+
+    issuerName:
+      raw.issuerName ??
+      raw.issuer_name ??
+      "",
+
+    issueDate:
+      raw.issueDate ??
+      raw.issue_date ??
+      "",
+
+    verificationToken:
+      raw.verificationToken ??
+      raw.verification_token ??
+      "",
+
+    status:
+      raw.status ??
+      "issued",
+
+    createdAt:
+      raw.createdAt ??
+      raw.created_at ??
+      "",
+
+    revokedAt:
+      raw.revokedAt ??
+      raw.revoked_at ??
+      "",
+  };
+}
+
+// =====================================================
+// UUID VALIDATION
+// =====================================================
+
+function isValidUUID(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+// =====================================================
+// EXTRACT TOKEN
+// Supports:
+// 1. Full verification URL
+// 2. Raw UUID
+// =====================================================
+
+function extractToken(value) {
+  if (!value) {
+    return "";
+  }
+
+  const cleanValue = value.trim();
+
+  // ---------------------------------------------------
+  // Try as URL
+  // ---------------------------------------------------
+
+  try {
+    const parsedUrl = new URL(cleanValue);
+
+    const urlToken =
+      parsedUrl.searchParams.get("token");
+
+    if (urlToken) {
+      return urlToken.trim();
+    }
+  } catch {
+    // Not a URL.
+  }
+
+  // ---------------------------------------------------
+  // Otherwise assume raw UUID
+  // ---------------------------------------------------
+
+  return cleanValue;
+}
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
+
 export default function VerifyCertificate() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  const [token, setToken] = useState(
-    searchParams.get("token") || ""
-  );
+  const [searchParams] =
+    useSearchParams();
 
-  const [certificate, setCertificate] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // ===================================================
+  // STATE
+  // ===================================================
 
-  const [manualToken, setManualToken] = useState(token);
+  const initialToken =
+    searchParams.get("token") || "";
 
+  const [token, setToken] =
+    useState(initialToken);
+
+  const [certificate, setCertificate] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [manualToken, setManualToken] =
+    useState(initialToken);
 
   // =====================================================
   // VERIFY CERTIFICATE
   // =====================================================
 
-async function verifyCertificate(value) {
-  let cleanValue = value?.trim();
+  async function verifyCertificate(value) {
+    // ---------------------------------------------------
+    // EXTRACT TOKEN
+    // ---------------------------------------------------
 
-  if (!cleanValue) {
-    setError("Please scan a valid certificate QR code.");
-    return;
-  }
+    const extractedToken =
+      extractToken(value);
 
-  // =====================================================
-  // IF A FULL VERIFICATION URL WAS PASSED,
-  // EXTRACT ONLY THE TOKEN
-  // =====================================================
-
-  try {
-    const parsedUrl = new URL(cleanValue);
-
-    if (parsedUrl.pathname === "/verify") {
-      const urlToken = parsedUrl.searchParams.get("token");
-
-      if (urlToken) {
-        cleanValue = urlToken.trim();
-      }
+    if (!extractedToken) {
+      setError(
+        "Please scan a valid certificate QR code."
+      );
+      return;
     }
-  } catch {
-    // Not a URL.
-    // Assume it is already a raw UUID token.
-  }
 
-  // =====================================================
-  // VALIDATE TOKEN
-  // =====================================================
+    // ---------------------------------------------------
+    // VALIDATE UUID
+    // ---------------------------------------------------
 
-  if (!/^[0-9a-f-]{36}$/i.test(cleanValue)) {
-    setError("Invalid certificate verification token.");
-    return;
-  }
+    if (!isValidUUID(extractedToken)) {
+      setCertificate(null);
 
-  try {
-    setLoading(true);
-    setError("");
-    setCertificate(null);
+      setError(
+        "Invalid certificate verification token."
+      );
 
-    console.log("=================================");
-    console.log("VERIFY TOKEN:", cleanValue);
-    console.log(
-      "VERIFY URL:",
-      `/verify/${encodeURIComponent(cleanValue)}`
-    );
-    console.log("=================================");
+      return;
+    }
 
-    const result = await apiRequest(
-      `/verify/${encodeURIComponent(cleanValue)}`
-    );
+    try {
+      setLoading(true);
+      setError("");
+      setCertificate(null);
 
-    console.log("VERIFY RESULT:", result);
+      console.log(
+        "================================="
+      );
 
-    if (!result?.verified) {
-      throw new Error(
-        result?.message ||
+      console.log(
+        "VERIFY TOKEN:",
+        extractedToken
+      );
+
+      console.log(
+        "VERIFY API:",
+        `/verify/${encodeURIComponent(
+          extractedToken
+        )}`
+      );
+
+      console.log(
+        "================================="
+      );
+
+      // -------------------------------------------------
+      // CALL BACKEND
+      // -------------------------------------------------
+
+      const result =
+        await apiRequest(
+          `/verify/${encodeURIComponent(
+            extractedToken
+          )}`,
+          {
+            method: "GET",
+          }
+        );
+
+      console.log(
+        "VERIFY RESULT:",
+        result
+      );
+
+      // -------------------------------------------------
+      // CERTIFICATE NOT RETURNED
+      // -------------------------------------------------
+
+      if (!result) {
+        throw new Error(
+          "No verification response received."
+        );
+      }
+
+      if (!result.certificate) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            "Certificate was not found."
+        );
+      }
+
+      // -------------------------------------------------
+      // NORMALIZE
+      // -------------------------------------------------
+
+      const normalizedCertificate =
+        normalizeCertificate(
+          result.certificate
+        );
+
+      console.log(
+        "NORMALIZED CERTIFICATE:",
+        normalizedCertificate
+      );
+
+      // -------------------------------------------------
+      // SAVE TOKEN
+      // -------------------------------------------------
+
+      setToken(
+        extractedToken
+      );
+
+      setManualToken(
+        extractedToken
+      );
+
+      // -------------------------------------------------
+      // SAVE CERTIFICATE
+      // -------------------------------------------------
+
+      setCertificate(
+        normalizedCertificate
+      );
+
+      console.log(
+        "Certificate verification request completed."
+      );
+
+    } catch (err) {
+      console.error(
+        "VERIFY ERROR:",
+        err
+      );
+
+      setCertificate(null);
+
+      setError(
+        err?.message ||
           "Certificate verification failed."
       );
+
+    } finally {
+      setLoading(false);
     }
-
-    if (!result?.certificate) {
-      throw new Error(
-        "Certificate information was not returned."
-      );
-    }
-
-    setToken(cleanValue);
-    setManualToken(cleanValue);
-    setCertificate(result.certificate);
-
-    console.log(
-      "Certificate verified successfully."
-    );
-
-  } catch (err) {
-    console.error(
-      "VERIFY ERROR:",
-      err
-    );
-
-    setError(
-      err?.message ||
-        "Certificate verification failed."
-    );
-
-  } finally {
-    setLoading(false);
   }
-}
 
   // =====================================================
   // AUTO VERIFY TOKEN FROM URL
   // =====================================================
 
   useEffect(() => {
-    const urlToken = searchParams.get("token");
+    const urlToken =
+      searchParams.get("token");
 
-    if (urlToken) {
-      setToken(urlToken);
-      setManualToken(urlToken);
-
-      verifyCertificate(urlToken);
+    if (!urlToken) {
+      return;
     }
 
+    setToken(urlToken);
+    setManualToken(urlToken);
+
+    verifyCertificate(urlToken);
+
+    // We intentionally run this only once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
 
   // =====================================================
   // MANUAL VERIFICATION
@@ -150,27 +328,34 @@ async function verifyCertificate(value) {
   function handleManualVerify(event) {
     event.preventDefault();
 
-    verifyCertificate(manualToken);
+    verifyCertificate(
+      manualToken
+    );
   }
-
 
   // =====================================================
   // QR SCANNER
   // =====================================================
 
-function handleScanResult(scannedValue) {
-  if (!scannedValue) return;
+  function handleScanResult(
+    scannedValue
+  ) {
+    if (!scannedValue) {
+      return;
+    }
 
-  const cleanValue = scannedValue.trim();
+    const cleanValue =
+      scannedValue.trim();
 
-  console.log("QR SCANNED:", cleanValue);
+    console.log(
+      "QR SCANNED:",
+      cleanValue
+    );
 
-  // Let verifyCertificate() handle both:
-  // 1. Full URL
-  // 2. Raw UUID
-  verifyCertificate(cleanValue);
-}
-
+    verifyCertificate(
+      cleanValue
+    );
+  }
 
   // =====================================================
   // RESET VERIFICATION
@@ -181,8 +366,45 @@ function handleScanResult(scannedValue) {
     setError("");
     setManualToken("");
     setToken("");
+
+    // Remove token from browser URL
+    navigate(
+      "/verify",
+      {
+        replace: true,
+      }
+    );
   }
 
+  // =====================================================
+  // FORMAT DATE
+  // =====================================================
+
+  function formatDate(date) {
+    if (!date) {
+      return "-";
+    }
+
+    const parsedDate =
+      new Date(date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return date;
+    }
+
+    return parsedDate.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
+  }
 
   // =====================================================
   // UI
@@ -193,7 +415,9 @@ function handleScanResult(scannedValue) {
 
       <div className="mx-auto w-full max-w-5xl">
 
-        {/* BACK BUTTON */}
+        {/* =================================================
+            BACK BUTTON
+        ================================================= */}
 
         <div className="mb-7">
           <BackButton
@@ -202,8 +426,9 @@ function handleScanResult(scannedValue) {
           />
         </div>
 
-
-        {/* HEADER */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
         <div className="mb-8 text-center">
 
@@ -221,13 +446,12 @@ function handleScanResult(scannedValue) {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-            Scan the certificate QR code or enter the
-            verification token to verify certificate
-            authenticity.
+            Scan the certificate QR code or
+            enter the verification token to
+            verify certificate authenticity.
           </p>
 
         </div>
-
 
         {/* =================================================
             VERIFICATION FORM
@@ -237,13 +461,17 @@ function handleScanResult(scannedValue) {
 
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/3 shadow-2xl">
 
+            {/* HEADER */}
+
             <div className="border-b border-white/10 px-5 py-5 sm:px-7">
 
               <div className="flex items-center gap-3">
 
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
 
-                  <ScanLine size={22} />
+                  <ScanLine
+                    size={22}
+                  />
 
                 </div>
 
@@ -254,8 +482,8 @@ function handleScanResult(scannedValue) {
                   </h2>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Point your camera at the certificate QR
-                    code.
+                    Point your camera at the
+                    certificate QR code.
                   </p>
 
                 </div>
@@ -264,21 +492,25 @@ function handleScanResult(scannedValue) {
 
             </div>
 
-
             <div className="p-5 sm:p-7">
 
-              {/* QR SCANNER */}
+              {/* =================================================
+                  QR SCANNER
+              ================================================= */}
 
               <div className="mx-auto max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4">
 
                 <QRScanner
-                  onScan={handleScanResult}
+                  onScan={
+                    handleScanResult
+                  }
                 />
 
               </div>
 
-
-              {/* OR */}
+              {/* =================================================
+                  OR
+              ================================================= */}
 
               <div className="my-7 flex items-center gap-4">
 
@@ -292,8 +524,9 @@ function handleScanResult(scannedValue) {
 
               </div>
 
-
-              {/* MANUAL TOKEN */}
+              {/* =================================================
+                  MANUAL TOKEN
+              ================================================= */}
 
               <div>
 
@@ -304,15 +537,16 @@ function handleScanResult(scannedValue) {
                   </h3>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Enter the unique certificate verification
-                    token manually.
+                    Enter the unique certificate
+                    verification token manually.
                   </p>
 
                 </div>
 
-
                 <form
-                  onSubmit={handleManualVerify}
+                  onSubmit={
+                    handleManualVerify
+                  }
                   className="flex flex-col gap-3 sm:flex-row"
                 >
 
@@ -320,12 +554,13 @@ function handleScanResult(scannedValue) {
                     type="text"
                     value={manualToken}
                     onChange={(event) =>
-                      setManualToken(event.target.value)
+                      setManualToken(
+                        event.target.value
+                      )
                     }
                     placeholder="Enter verification token"
                     className="h-12 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/60"
                   />
-
 
                   <button
                     type="submit"
@@ -333,7 +568,9 @@ function handleScanResult(scannedValue) {
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-cyan-400 px-6 text-sm font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
 
-                    <Search size={18} />
+                    <Search
+                      size={18}
+                    />
 
                     {loading
                       ? "Verifying..."
@@ -345,8 +582,9 @@ function handleScanResult(scannedValue) {
 
               </div>
 
-
-              {/* ERROR */}
+              {/* =================================================
+                  ERROR
+              ================================================= */}
 
               {error && (
 
@@ -379,22 +617,28 @@ function handleScanResult(scannedValue) {
 
         )}
 
-
         {/* =================================================
-            VERIFIED CERTIFICATE
+            VERIFIED / REVOKED CERTIFICATE
         ================================================= */}
 
         {certificate && (
 
           <div
             className={`overflow-hidden rounded-2xl border p-8 text-center shadow-2xl ${
-              certificate.status === "issued"
+              certificate.status
+                ?.toLowerCase() === "issued"
                 ? "border-emerald-400/20 bg-emerald-400/6"
                 : "border-red-400/20 bg-red-400/6"
             }`}
           >
 
-            {certificate.status === "issued" ? (
+            {/* =================================================
+                ISSUED
+            ================================================= */}
+
+            {certificate.status
+              ?.toLowerCase() ===
+            "issued" ? (
 
               <>
 
@@ -409,19 +653,16 @@ function handleScanResult(scannedValue) {
 
                 </div>
 
-
                 {/* TITLE */}
 
                 <h2 className="mt-6 text-2xl font-extrabold text-emerald-400 sm:text-3xl">
                   Certificate Verified
                 </h2>
 
-
                 <p className="mt-3 text-sm text-slate-400">
-                  Certificate authenticity has been
-                  successfully verified.
+                  Certificate authenticity has
+                  been successfully verified.
                 </p>
-
 
                 {/* CERTIFICATE NUMBER */}
 
@@ -432,11 +673,11 @@ function handleScanResult(scannedValue) {
                   </p>
 
                   <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
-                    {certificate.certificateNo}
+                    {certificate.certificateNo ||
+                      "-"}
                   </p>
 
                 </div>
-
 
                 {/* DETAILS */}
 
@@ -449,11 +690,11 @@ function handleScanResult(scannedValue) {
                     </p>
 
                     <p className="mt-1 font-semibold text-white">
-                      {certificate.recipientName}
+                      {certificate.recipientName ||
+                        "-"}
                     </p>
 
                   </div>
-
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-4">
 
@@ -462,11 +703,11 @@ function handleScanResult(scannedValue) {
                     </p>
 
                     <p className="mt-1 font-semibold text-white">
-                      {certificate.courseName}
+                      {certificate.courseName ||
+                        "-"}
                     </p>
 
                   </div>
-
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-4">
 
@@ -475,28 +716,44 @@ function handleScanResult(scannedValue) {
                     </p>
 
                     <p className="mt-1 font-semibold text-white">
-                      {certificate.issuerName}
+                      {certificate.issuerName ||
+                        "-"}
                     </p>
 
                   </div>
 
-
                   <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+
+                    <p className="text-xs text-slate-500">
+                      Issue Date
+                    </p>
+
+                    <p className="mt-1 font-semibold text-white">
+                      {formatDate(
+                        certificate.issueDate
+                      )}
+                    </p>
+
+                  </div>
+
+                  <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/5 p-4 sm:col-span-2">
 
                     <p className="text-xs text-slate-500">
                       Status
                     </p>
 
-                    <p className="mt-1 font-semibold text-emerald-400">
-                      {certificate.status}
+                    <p className="mt-1 font-semibold capitalize text-emerald-400">
+                      {certificate.status ||
+                        "issued"}
                     </p>
 
                   </div>
 
                 </div>
 
-
-                {/* VIEW CERTIFICATE */}
+                {/* =================================================
+                    VIEW CERTIFICATE
+                ================================================= */}
 
                 <button
                   type="button"
@@ -512,18 +769,23 @@ function handleScanResult(scannedValue) {
 
                   View Certificate
 
-                  <ArrowRight size={16} />
+                  <ArrowRight
+                    size={16}
+                  />
 
                 </button>
 
-
-                {/* VERIFY ANOTHER */}
+                {/* =================================================
+                    VERIFY ANOTHER
+                ================================================= */}
 
                 <div>
 
                   <button
                     type="button"
-                    onClick={resetVerification}
+                    onClick={
+                      resetVerification
+                    }
                     className="mt-4 text-sm text-slate-500 hover:text-cyan-400"
                   >
                     Verify Another Certificate
@@ -535,8 +797,11 @@ function handleScanResult(scannedValue) {
 
             ) : (
 
+              /* =================================================
+                 REVOKED
+              ================================================= */
+
               <>
-                {/* REVOKED */}
 
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-red-400/20 bg-red-400/10">
 
@@ -547,16 +812,14 @@ function handleScanResult(scannedValue) {
 
                 </div>
 
-
                 <h2 className="mt-6 text-2xl font-extrabold text-red-400">
                   Certificate Revoked
                 </h2>
 
-
                 <p className="mx-auto mt-3 max-w-lg text-sm text-slate-400">
-                  This certificate is no longer valid.
+                  This certificate is no longer
+                  valid.
                 </p>
-
 
                 <div className="mx-auto mt-6 max-w-md rounded-xl border border-red-400/10 bg-black/20 px-5 py-4">
 
@@ -565,16 +828,31 @@ function handleScanResult(scannedValue) {
                   </p>
 
                   <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
-                    {certificate.certificateNo}
+                    {certificate.certificateNo ||
+                      "-"}
                   </p>
 
                 </div>
 
+                <div className="mx-auto mt-4 max-w-md rounded-xl border border-white/10 bg-black/20 px-5 py-4">
+
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Status
+                  </p>
+
+                  <p className="mt-1 font-semibold capitalize text-red-400">
+                    {certificate.status ||
+                      "revoked"}
+                  </p>
+
+                </div>
 
                 <button
                   type="button"
-                  onClick={resetVerification}
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-white/4 px-5 text-sm font-semibold text-white"
+                  onClick={
+                    resetVerification
+                  }
+                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-white/4 px-5 text-sm font-semibold text-white transition hover:bg-white/8"
                 >
                   Verify Another Certificate
                 </button>
@@ -586,7 +864,6 @@ function handleScanResult(scannedValue) {
           </div>
 
         )}
-
 
         {/* =================================================
             SECURITY CARDS
@@ -615,8 +892,9 @@ function handleScanResult(scannedValue) {
 
         )}
 
-
-        {/* FOOTER */}
+        {/* =================================================
+            FOOTER
+        ================================================= */}
 
         <div className="mt-8 pb-5 text-center">
 
@@ -632,18 +910,22 @@ function handleScanResult(scannedValue) {
   );
 }
 
-
 // =====================================================
 // SECURITY CARD
 // =====================================================
 
-function SecurityCard({ title, text }) {
+function SecurityCard({
+  title,
+  text,
+}) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/2.5 p-5">
 
       <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-400">
 
-        <ShieldCheck size={18} />
+        <ShieldCheck
+          size={18}
+        />
 
       </div>
 

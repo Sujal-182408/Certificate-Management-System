@@ -1,5 +1,13 @@
-require("dotenv").config({
-  path: require("path").join(__dirname, ".env"),
+// ============================================================
+// CERTIFICATE API SERVER
+// ============================================================
+
+const path = require("path");
+const dotenv = require("dotenv");
+
+// Load backend .env
+dotenv.config({
+  path: path.resolve(__dirname, ".env"),
 });
 
 const express = require("express");
@@ -9,6 +17,10 @@ const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 
 const pool = require("./db");
+
+// ============================================================
+// AUTH ROUTES
+// ============================================================
 
 const {
   router: auth,
@@ -20,78 +32,96 @@ const {
   requireEmployee,
 } = require("./routes/employeeAuth");
 
+// ============================================================
+// APP
+// ============================================================
 
 const app = express();
 
+app.disable("x-powered-by");
+
+// ============================================================
+// CONFIG
+// ============================================================
+
 const PORT =
-  process.env.PORT || 5000;
+  Number(process.env.PORT) || 5000;
 
 const CLIENT_URL =
   process.env.CLIENT_URL ||
-  "http://localhost:5173";
+  "http://192.168.1.5:5174";
 
+// ============================================================
+// COMPANY EMAIL
+// ============================================================
 
-// =====================================================
-// STARTUP ENV CHECK
-// =====================================================
+function isCompanyEmail(email) {
+  return /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@esparksit\.com$/i.test(
+    String(email || "").trim()
+  );
+}
 
-console.log("======================================");
-console.log("CertiVerify Certificate API");
-console.log("======================================");
-
-console.log(
-  "DB host:",
-  process.env.DB_HOST
-);
-
-console.log(
-  "DB port:",
-  process.env.DB_PORT
-);
-
-console.log(
-  "DB name:",
-  process.env.DB_NAME
-);
-
-console.log(
-  "DB user:",
-  process.env.DB_USER
-);
-
-console.log(
-  "DB password loaded:",
-  Boolean(process.env.DB_PASSWORD)
-);
-
-console.log(
-  "CLIENT_URL:",
-  CLIENT_URL
-);
-
-console.log(
-  "JWT secret loaded:",
-  Boolean(process.env.JWT_SECRET)
-);
-
-console.log("======================================");
-
-
-// =====================================================
+// ============================================================
 // CORS
-// =====================================================
+// ============================================================
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+
+  "http://192.168.1.5:5174",
+
+  "https://q8n7zrnv-5173.inc1.devtunnels.ms",
+
+  CLIENT_URL,
+].filter(Boolean);
 
 app.use(
   cors({
-    origin: CLIENT_URL,
+    origin: function (origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.log(
+        "Blocked CORS origin:",
+        origin
+      );
+
+      return callback(
+        new Error("Not allowed by CORS")
+      );
+    },
+
     credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+    ],
   })
 );
 
-
-// =====================================================
-// SECURITY HEADERS
-// =====================================================
+// ============================================================
+// SECURITY
+// ============================================================
 
 app.use(
   helmet({
@@ -99,414 +129,616 @@ app.use(
   })
 );
 
-
-// =====================================================
+// ============================================================
 // BODY PARSERS
-// =====================================================
+// ============================================================
 
 app.use(
   express.json({
-    limit: "1mb",
+    limit: "10kb",
   })
 );
 
 app.use(
   express.urlencoded({
     extended: true,
-    limit: "1mb",
+    limit: "10kb",
   })
 );
 
-
-// =====================================================
+// ============================================================
 // COOKIE PARSER
-// =====================================================
+// ============================================================
 
 app.use(cookieParser());
 
-
-// =====================================================
+// ============================================================
 // REQUEST LOGGER
-// =====================================================
+// ============================================================
 
-app.use(
-  (req, res, next) => {
+app.use((req, res, next) => {
+  console.log(
+    `${new Date().toISOString()} ${req.method} ${req.originalUrl}`
+  );
 
-    console.log(
-      `${new Date().toISOString()} ${req.method} ${req.originalUrl}`
-    );
+  next();
+});
 
-    next();
-
-  }
-);
-
-
-// =====================================================
+// ============================================================
 // HEALTH CHECK
-// =====================================================
+// ============================================================
 
 app.get(
   "/api/health",
-
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res) => {
     try {
+      await pool.query("SELECT 1");
 
-      await pool.query(
-        "SELECT 1"
-      );
-
-      res.json({
-
+      return res.status(200).json({
         ok: true,
-
         message:
           "Certificate API is running.",
-
+        database: "connected",
         timestamp:
           new Date().toISOString(),
-
       });
-
     } catch (error) {
+      console.error(
+        "Health check database error:",
+        error
+      );
 
-      next(error);
-
+      return res.status(503).json({
+        ok: false,
+        message:
+          "Certificate API is running but database is unavailable.",
+        database: "disconnected",
+      });
     }
-
   }
 );
 
-
-// =====================================================
+// ============================================================
 // AUTH ROUTES
-// =====================================================
+// ============================================================
 
 app.use(
   "/api/auth",
   auth
 );
 
-
 app.use(
   "/api/employee-auth",
   employeeAuth
 );
 
-
-// =====================================================
-// VERIFY RATE LIMITER
-// =====================================================
-
-const verifyLimiter =
-  rateLimit({
-
-    windowMs:
-      60 * 1000,
-
-    limit:
-      60,
-
-    standardHeaders:
-      true,
-
-    legacyHeaders:
-      false,
-
-    message: {
-      message:
-        "Too many verification requests. Please try again later.",
-    },
-
-  });
-
-
-// =====================================================
-// ADMIN TEST
-// =====================================================
+// ============================================================
+// ADMIN TEST ROUTE
+// ============================================================
 
 app.get(
-
   "/api/admin/test",
-
   requireAdmin,
-
-  async (
-    req,
-    res
-  ) => {
-
-    res.json({
-
-      ok: true,
-
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
       message:
         "Admin authentication is working.",
-
-      admin:
-        req.admin || null,
-
+      admin: req.admin || null,
     });
-
   }
-
 );
 
+// ============================================================
+// ADMIN - GET ALL EMPLOYEES
+// ============================================================
 
-// =====================================================
-// CREATE CERTIFICATE
-// POST /api/admin/certificates
-// =====================================================
+app.get(
+  "/api/admin/employees",
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const result =
+        await pool.query(`
+          SELECT
+            id,
+            name,
+            email,
+            is_active,
+            created_at
+          FROM employee_users
+          ORDER BY id DESC
+        `);
+
+      return res.status(200).json({
+        success: true,
+        employees:
+          result.rows,
+      });
+    } catch (error) {
+      console.error(
+        "Get employees error:",
+        error
+      );
+
+      next(error);
+    }
+  }
+);
+
+// ============================================================
+// ADMIN - GET SINGLE EMPLOYEE + CERTIFICATES
+// ============================================================
+
+app.get(
+  "/api/admin/employees/:id",
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const employeeId =
+        String(
+          req.params.id || ""
+        ).trim();
+
+      if (
+        !/^\d+$/.test(employeeId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid employee ID.",
+        });
+      }
+
+      const employeeResult =
+        await pool.query(
+          `
+          SELECT
+            id,
+            name,
+            email,
+            is_active,
+            created_at
+          FROM employee_users
+          WHERE id = $1
+          LIMIT 1
+          `,
+          [employeeId]
+        );
+
+      if (
+        employeeResult.rows.length ===
+        0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Employee not found.",
+        });
+      }
+
+      const employee =
+        employeeResult.rows[0];
+
+      const certificateResult =
+        await pool.query(
+          `
+          SELECT
+            id,
+            certificate_no,
+            certificate_type,
+            recipient_name,
+            course_name,
+            issuer_name,
+            issue_date,
+            verification_token,
+            status,
+            created_at,
+            revoked_at,
+            qr_generated_at
+          FROM certificates
+          WHERE employee_id = $1
+          ORDER BY created_at DESC
+          `,
+          [employeeId]
+        );
+
+      return res.status(200).json({
+        success: true,
+
+        employee: {
+          ...employee,
+
+          certificates:
+            certificateResult.rows,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Get employee details error:",
+        error
+      );
+
+      next(error);
+    }
+  }
+);
+
+// ============================================================
+// ADMIN - CREATE CERTIFICATE
+//
+// Automatically generates:
+//
+// EITS-CERT-2026-1001
+// EITS-CERT-2026-1002
+//
+// EITS-INTR-2026-1001
+// EITS-INTR-2026-1002
+//
+// Only @esparksit.com employees can receive certificates.
+// ============================================================
 
 app.post(
-
   "/api/admin/certificates",
-
   requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
+  async (req, res, next) => {
+    const client =
+      await pool.connect();
 
     try {
-
       const {
-        certificateNo,
-        recipientName,
+        certificateType,
+        employeeEmail,
         courseName,
         issuerName,
         issueDate,
-        employeeId,
       } = req.body;
 
-
-      // -----------------------------------------------
-      // VALIDATION
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // REQUIRED FIELDS
+      // --------------------------------------------------------
 
       if (
-        !certificateNo ||
-        !recipientName ||
+        !certificateType ||
+        !employeeEmail ||
         !courseName ||
         !issuerName ||
         !issueDate
       ) {
-
         return res.status(400).json({
-
+          success: false,
           message:
-            "Certificate number, recipient name, course name, issuer name and issue date are required.",
-
+            "Certificate type, employee email, course name, issuer name and issue date are required.",
         });
-
       }
 
+      // --------------------------------------------------------
+      // CLEAN VALUES
+      // --------------------------------------------------------
 
-      const cleanCertificateNo =
+      const cleanCertificateType =
         String(
-          certificateNo
-        ).trim();
+          certificateType
+        )
+          .trim()
+          .toUpperCase();
 
-
-      const cleanRecipientName =
+      const cleanEmployeeEmail =
         String(
-          recipientName
-        ).trim();
-
+          employeeEmail
+        )
+          .trim()
+          .toLowerCase();
 
       const cleanCourseName =
         String(
           courseName
         ).trim();
 
-
       const cleanIssuerName =
         String(
           issuerName
         ).trim();
 
+      const cleanIssueDate =
+        String(
+          issueDate
+        ).trim();
+
+      // --------------------------------------------------------
+      // CERTIFICATE TYPE
+      // --------------------------------------------------------
 
       if (
-        !cleanCertificateNo ||
-        !cleanRecipientName ||
-        !cleanCourseName ||
-        !cleanIssuerName
-      ) {
-
-        return res.status(400).json({
-
-          message:
-            "Certificate fields cannot be empty.",
-
-        });
-
-      }
-
-
-      // -----------------------------------------------
-      // DATE VALIDATION
-      // -----------------------------------------------
-
-      const parsedDate =
-        new Date(issueDate);
-
-
-      if (
-        Number.isNaN(
-          parsedDate.getTime()
+        !["CERT", "INTR"].includes(
+          cleanCertificateType
         )
       ) {
-
         return res.status(400).json({
-
+          success: false,
           message:
-            "Invalid issue date.",
-
+            "Certificate type must be CERT or INTR.",
         });
-
       }
 
+      // --------------------------------------------------------
+      // EMAIL FORMAT
+      // --------------------------------------------------------
 
-      // -----------------------------------------------
-      // DUPLICATE CERTIFICATE NUMBER
-      // -----------------------------------------------
+      const emailRegex =
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-      const duplicate =
-        await pool.query(
+      if (
+        !emailRegex.test(
+          cleanEmployeeEmail
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid employee email.",
+        });
+      }
 
-          `
-          SELECT id
-          FROM certificates
-          WHERE certificate_no = $1
-          LIMIT 1
-          `,
+      // --------------------------------------------------------
+      // COMPANY EMAIL CHECK
+      // --------------------------------------------------------
 
-          [
-            cleanCertificateNo,
-          ]
+      if (
+        !isCompanyEmail(
+          cleanEmployeeEmail
+        )
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Certificates can only be issued to employees with an @esparksit.com company email address.",
+        });
+      }
 
+      // --------------------------------------------------------
+      // COURSE VALIDATION
+      // --------------------------------------------------------
+
+      if (
+        !cleanCourseName
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Course name is required.",
+        });
+      }
+
+      if (
+        cleanCourseName.length >
+        200
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Course name must be at most 200 characters.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // ISSUER VALIDATION
+      // --------------------------------------------------------
+
+      if (
+        !cleanIssuerName
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Issuer name is required.",
+        });
+      }
+
+      if (
+        cleanIssuerName.length >
+        200
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Issuer name must be at most 200 characters.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // DATE VALIDATION
+      // --------------------------------------------------------
+
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          cleanIssueDate
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Issue date must be in YYYY-MM-DD format.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // CERTIFICATE YEAR
+      // --------------------------------------------------------
+
+      const certificateYear =
+        Number(
+          cleanIssueDate.slice(
+            0,
+            4
+          )
         );
 
-
       if (
-        duplicate.rows.length > 0
+        !Number.isInteger(
+          certificateYear
+        ) ||
+        certificateYear < 2000
       ) {
-
-        return res.status(409).json({
-
+        return res.status(400).json({
+          success: false,
           message:
-            "A certificate with this certificate number already exists.",
-
+            "Invalid certificate year.",
         });
-
       }
 
+      // --------------------------------------------------------
+      // FIND EMPLOYEE
+      // --------------------------------------------------------
 
-      // -----------------------------------------------
-      // EMPLOYEE VALIDATION
-      // -----------------------------------------------
-
-      let employee = null;
-
+      const employeeResult =
+        await client.query(
+          `
+          SELECT
+            id,
+            name,
+            email,
+            is_active
+          FROM employee_users
+          WHERE LOWER(TRIM(email)) =
+                LOWER(TRIM($1))
+          LIMIT 1
+          `,
+          [cleanEmployeeEmail]
+        );
 
       if (
-        employeeId !== undefined &&
-        employeeId !== null &&
-        String(employeeId).trim() !== ""
+        employeeResult.rows.length ===
+        0
       ) {
-
-        const employeeResult =
-          await pool.query(
-
-            `
-            SELECT
-              id,
-              name,
-              email,
-              is_active
-            FROM employee_users
-            WHERE id = $1
-            LIMIT 1
-            `,
-
-            [
-              employeeId,
-            ]
-
-          );
-
-
-        if (
-          employeeResult.rows.length === 0
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Employee not found.",
-
-          });
-
-        }
-
-
-        employee =
-          employeeResult.rows[0];
-
-
-        if (
-          !employee.is_active
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Employee account is inactive.",
-
-          });
-
-        }
-
-
-        // Recipient must match employee
-        if (
-          employee.name
-            .trim()
-            .toLowerCase() !==
-          cleanRecipientName
-            .toLowerCase()
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Recipient name must match the selected employee name.",
-
-          });
-
-        }
-
+        return res.status(404).json({
+          success: false,
+          message:
+            "No employee account exists with this email address.",
+        });
       }
 
+      const employee =
+        employeeResult.rows[0];
 
-      // -----------------------------------------------
-      // INSERT CERTIFICATE
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // CHECK ACTUAL DATABASE EMAIL
+      // --------------------------------------------------------
 
-      const result =
-        await pool.query(
+      if (
+        !isCompanyEmail(
+          employee.email
+        )
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "This employee does not have a valid eSparks company email address.",
+        });
+      }
 
+      // --------------------------------------------------------
+      // CHECK ACTIVE
+      // --------------------------------------------------------
+
+      if (
+        !employee.is_active
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "This employee account is inactive.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // START TRANSACTION
+      // --------------------------------------------------------
+
+      await client.query(
+        "BEGIN"
+      );
+
+      // --------------------------------------------------------
+      // GENERATE NUMBER
+      // --------------------------------------------------------
+
+      const sequenceResult =
+        await client.query(
           `
-          INSERT INTO certificates
-          (
+          INSERT INTO certificate_number_sequences (
+            certificate_type,
+            certificate_year,
+            next_number
+          )
+          VALUES (
+            $1,
+            $2,
+            1002
+          )
+
+          ON CONFLICT (
+            certificate_type,
+            certificate_year
+          )
+
+          DO UPDATE SET
+            next_number =
+              certificate_number_sequences.next_number + 1
+
+          RETURNING
+            next_number - 1 AS generated_number
+          `,
+          [
+            cleanCertificateType,
+            certificateYear,
+          ]
+        );
+
+      if (
+        sequenceResult.rows.length ===
+        0
+      ) {
+        throw new Error(
+          "Unable to generate certificate number."
+        );
+      }
+
+      const certificateNumberValue =
+        Number(
+          sequenceResult.rows[0]
+            .generated_number
+        );
+
+      if (
+        !Number.isInteger(
+          certificateNumberValue
+        ) ||
+        certificateNumberValue <
+          1001
+      ) {
+        throw new Error(
+          "Invalid generated certificate number."
+        );
+      }
+
+      // --------------------------------------------------------
+      // FINAL AUTOMATIC CERTIFICATE ID
+      // --------------------------------------------------------
+
+      const certificateNo =
+        `EITS-${cleanCertificateType}-${certificateYear}-${certificateNumberValue}`;
+
+      // --------------------------------------------------------
+      // INSERT CERTIFICATE
+      // --------------------------------------------------------
+
+      const certificateResult =
+        await client.query(
+          `
+          INSERT INTO certificates (
             certificate_no,
+            certificate_type,
             recipient_name,
             course_name,
             issuer_name,
@@ -514,21 +746,20 @@ app.post(
             employee_id,
             status
           )
-
-          VALUES
-          (
+          VALUES (
             $1,
             $2,
             $3,
             $4,
             $5,
             $6,
+            $7,
             'issued'
           )
-
           RETURNING
             id,
             certificate_no,
+            certificate_type,
             recipient_name,
             course_name,
             issuer_name,
@@ -538,143 +769,145 @@ app.post(
             employee_id,
             created_at
           `,
-
           [
-            cleanCertificateNo,
-            cleanRecipientName,
+            certificateNo,
+            cleanCertificateType,
+            employee.name,
             cleanCourseName,
             cleanIssuerName,
-            issueDate,
-            employeeId || null,
+            cleanIssueDate,
+            employee.id,
           ]
-
         );
 
-
       const certificate =
-        result.rows[0];
+        certificateResult.rows[0];
 
-
-      // -----------------------------------------------
+      // --------------------------------------------------------
       // AUDIT LOG
-      // -----------------------------------------------
+      // --------------------------------------------------------
 
-      await pool.query(
-
+      await client.query(
         `
-        INSERT INTO certificate_audit_logs
-        (
+        INSERT INTO certificate_audit_logs (
           certificate_id,
           action,
           performed_by,
           details
         )
-
-        VALUES
-        (
+        VALUES (
           $1,
           $2,
           $3,
           $4
         )
         `,
-
         [
           certificate.id,
 
-          "CREATE_CERTIFICATE",
+          "CERTIFICATE_CREATED",
 
-          req.admin?.id ||
-            null,
+          req.admin?.email ||
+            req.admin?.id?.toString() ||
+            "admin",
 
           JSON.stringify({
-            certificateNo:
+            certificate_no:
               certificate.certificate_no,
 
-            recipientName:
-              certificate.recipient_name,
+            certificate_type:
+              certificate.certificate_type,
 
-            employeeId:
-              certificate.employee_id,
+            certificate_year:
+              certificateYear,
+
+            employee_id:
+              employee.id,
+
+            employee_email:
+              employee.email,
           }),
-
         ]
-
       );
 
+      // --------------------------------------------------------
+      // COMMIT
+      // --------------------------------------------------------
+
+      await client.query(
+        "COMMIT"
+      );
 
       return res.status(201).json({
+        success: true,
 
         message:
           "Certificate created successfully.",
 
-        certificate,
+        certificate: {
+          ...certificate,
 
+          employee_name:
+            employee.name,
+
+          employee_email:
+            employee.email,
+        },
       });
-
     } catch (error) {
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+      } catch {}
 
       console.error(
         "Create certificate error:",
         error
       );
 
+      if (
+        error.code === "23505"
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Certificate number or verification token already exists.",
+        });
+      }
+
       next(error);
-
+    } finally {
+      client.release();
     }
-
   }
-
 );
 
-
-// =====================================================
-// GET ALL CERTIFICATES
-// GET /api/admin/certificates
-// =====================================================
+// ============================================================
+// ADMIN - GET ALL CERTIFICATES
+// ============================================================
 
 app.get(
-
   "/api/admin/certificates",
-
   requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res, next) => {
     try {
-
       const result =
-        await pool.query(
-
-          `
+        await pool.query(`
           SELECT
-
             c.id,
-
             c.certificate_no,
-
+            c.certificate_type,
             c.recipient_name,
-
             c.course_name,
-
             c.issuer_name,
-
             c.issue_date,
-
             c.status,
-
             c.created_at,
-
             c.revoked_at,
-
             c.employee_id,
 
             e.name AS employee_name,
-
             e.email AS employee_email
 
           FROM certificates c
@@ -682,85 +915,70 @@ app.get(
           LEFT JOIN employee_users e
             ON c.employee_id = e.id
 
-          ORDER BY
-            c.created_at DESC
-          `
+          ORDER BY c.created_at DESC
+        `);
 
-        );
-
-
-      return res.json({
-
+      return res.status(200).json({
+        success: true,
         certificates:
           result.rows,
-
       });
-
     } catch (error) {
+      console.error(
+        "Get certificates error:",
+        error
+      );
 
       next(error);
-
     }
-
   }
-
 );
 
-
-// =====================================================
-// GET SINGLE CERTIFICATE
-// GET /api/admin/certificates/:id
-// =====================================================
+// ============================================================
+// ADMIN - GET SINGLE CERTIFICATE
+// ============================================================
 
 app.get(
-
   "/api/admin/certificates/:id",
-
   requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res, next) => {
     try {
+      const certificateId =
+        Number(
+          req.params.id
+        );
 
-      const {
-        id,
-      } = req.params;
-
+      if (
+        !Number.isInteger(
+          certificateId
+        ) ||
+        certificateId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid certificate ID.",
+        });
+      }
 
       const result =
         await pool.query(
-
           `
           SELECT
-
             c.id,
-
             c.certificate_no,
-
+            c.certificate_type,
             c.recipient_name,
-
             c.course_name,
-
             c.issuer_name,
-
             c.issue_date,
-
             c.verification_token,
-
             c.status,
-
             c.created_at,
-
             c.revoked_at,
-
             c.employee_id,
 
             e.name AS employee_name,
-
             e.email AS employee_email
 
           FROM certificates c
@@ -772,72 +990,79 @@ app.get(
 
           LIMIT 1
           `,
-
-          [
-            id,
-          ]
-
+          [certificateId]
         );
 
-
       if (
-        result.rows.length === 0
+        result.rows.length ===
+        0
       ) {
-
         return res.status(404).json({
-
+          success: false,
           message:
             "Certificate not found.",
-
         });
-
       }
 
-
-      return res.json({
-
+      return res.status(200).json({
+        success: true,
         certificate:
           result.rows[0],
-
       });
-
     } catch (error) {
+      console.error(
+        "Get certificate error:",
+        error
+      );
 
       next(error);
-
     }
-
   }
-
 );
 
-
-// =====================================================
-// UPDATE CERTIFICATE
-// PUT /api/admin/certificates/:id
-// =====================================================
+// ============================================================
+// ADMIN - UPDATE CERTIFICATE
+//
+// IMPORTANT:
+// certificate_no and certificate_type are IMMUTABLE.
+//
+// Admin can update:
+// - employee
+// - recipient
+// - course
+// - issuer
+// - issue date
+//
+// Certificate number remains the automatically generated ID.
+// ============================================================
 
 app.put(
-
   "/api/admin/certificates/:id",
-
   requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
+  async (req, res, next) => {
+    const client =
+      await pool.connect();
 
     try {
+      const certificateId =
+        Number(
+          req.params.id
+        );
+
+      if (
+        !Number.isInteger(
+          certificateId
+        ) ||
+        certificateId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid certificate ID.",
+        });
+      }
 
       const {
-        id,
-      } = req.params;
-
-
-      const {
-        certificateNo,
         recipientName,
         courseName,
         issuerName,
@@ -845,588 +1070,560 @@ app.put(
         employeeId,
       } = req.body;
 
-
-      // -----------------------------------------------
-      // VALIDATION
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // REQUIRED FIELDS
+      // --------------------------------------------------------
 
       if (
-        !certificateNo ||
         !recipientName ||
         !courseName ||
         !issuerName ||
-        !issueDate
+        !issueDate ||
+        !employeeId
       ) {
-
         return res.status(400).json({
-
+          success: false,
           message:
-            "All certificate fields are required.",
-
+            "Recipient name, course name, issuer name, issue date and employee are required.",
         });
-
       }
 
-
-      const cleanCertificateNo =
-        String(
-          certificateNo
-        ).trim();
-
+      // --------------------------------------------------------
+      // CLEAN VALUES
+      // --------------------------------------------------------
 
       const cleanRecipientName =
         String(
           recipientName
         ).trim();
 
-
       const cleanCourseName =
         String(
           courseName
         ).trim();
-
 
       const cleanIssuerName =
         String(
           issuerName
         ).trim();
 
+      const cleanIssueDate =
+        String(
+          issueDate
+        ).trim();
 
-      const parsedDate =
-        new Date(issueDate);
+      const cleanEmployeeId =
+        Number(
+          employeeId
+        );
 
+      // --------------------------------------------------------
+      // EMPLOYEE ID
+      // --------------------------------------------------------
 
       if (
-        Number.isNaN(
-          parsedDate.getTime()
-        )
+        !Number.isInteger(
+          cleanEmployeeId
+        ) ||
+        cleanEmployeeId <= 0
       ) {
-
         return res.status(400).json({
-
+          success: false,
           message:
-            "Invalid issue date.",
-
+            "Invalid employee ID.",
         });
-
       }
 
-
-      // -----------------------------------------------
-      // CERTIFICATE EXISTS
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // GET EXISTING CERTIFICATE
+      // --------------------------------------------------------
 
       const existing =
-        await pool.query(
-
+        await client.query(
           `
           SELECT
             id,
             certificate_no,
-            status
+            certificate_type,
+            issue_date,
+            employee_id
           FROM certificates
           WHERE id = $1
           LIMIT 1
           `,
-
-          [
-            id,
-          ]
-
+          [certificateId]
         );
 
-
       if (
-        existing.rows.length === 0
+        existing.rows.length ===
+        0
       ) {
-
         return res.status(404).json({
-
+          success: false,
           message:
             "Certificate not found.",
-
         });
-
       }
 
+      const existingCertificate =
+        existing.rows[0];
 
-      // -----------------------------------------------
-      // DUPLICATE NUMBER
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // DATE FORMAT
+      // --------------------------------------------------------
 
-      const duplicate =
-        await pool.query(
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(
+          cleanIssueDate
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Issue date must be in YYYY-MM-DD format.",
+        });
+      }
 
-          `
-          SELECT id
+      // --------------------------------------------------------
+      // CERTIFICATE YEAR MUST NOT CHANGE
+      // --------------------------------------------------------
 
-          FROM certificates
-
-          WHERE
-            certificate_no = $1
-            AND id <> $2
-
-          LIMIT 1
-          `,
-
-          [
-            cleanCertificateNo,
-            id,
-          ]
-
+      const certificateIdMatch =
+        /^EITS-(CERT|INTR)-(\d{4})-\d+$/.exec(
+          existingCertificate.certificate_no
         );
 
-
       if (
-        duplicate.rows.length > 0
+        certificateIdMatch &&
+        certificateIdMatch[2] !==
+          cleanIssueDate.slice(0, 4)
       ) {
-
-        return res.status(409).json({
-
+        return res.status(400).json({
+          success: false,
           message:
-            "Another certificate already uses this certificate number.",
-
+            "The issue date year cannot be changed because it is part of the certificate number.",
         });
-
       }
 
+      // --------------------------------------------------------
+      // FIND EMPLOYEE
+      // --------------------------------------------------------
 
-      // -----------------------------------------------
-      // EMPLOYEE VALIDATION
-      // -----------------------------------------------
+      const employeeResult =
+        await client.query(
+          `
+          SELECT
+            id,
+            name,
+            email,
+            is_active
+          FROM employee_users
+          WHERE id = $1
+          LIMIT 1
+          `,
+          [cleanEmployeeId]
+        );
 
       if (
-        employeeId !== undefined &&
-        employeeId !== null &&
-        String(employeeId).trim() !== ""
+        employeeResult.rows.length ===
+        0
       ) {
-
-        const employeeResult =
-          await pool.query(
-
-            `
-            SELECT
-              id,
-              name,
-              is_active
-
-            FROM employee_users
-
-            WHERE id = $1
-
-            LIMIT 1
-            `,
-
-            [
-              employeeId,
-            ]
-
-          );
-
-
-        if (
-          employeeResult.rows.length === 0
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Employee not found.",
-
-          });
-
-        }
-
-
-        const employee =
-          employeeResult.rows[0];
-
-
-        if (
-          !employee.is_active
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Employee account is inactive.",
-
-          });
-
-        }
-
-
-        if (
-          employee.name
-            .trim()
-            .toLowerCase() !==
-          cleanRecipientName
-            .toLowerCase()
-        ) {
-
-          return res.status(400).json({
-
-            message:
-              "Recipient name must match the selected employee name.",
-
-          });
-
-        }
-
+        return res.status(404).json({
+          success: false,
+          message:
+            "Employee not found.",
+        });
       }
 
+      const employee =
+        employeeResult.rows[0];
 
-      // -----------------------------------------------
+      // --------------------------------------------------------
+      // COMPANY EMAIL CHECK
+      // --------------------------------------------------------
+
+      if (
+        !isCompanyEmail(
+          employee.email
+        )
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Certificates can only be assigned to employees with an @esparksit.com company email address.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // ACTIVE CHECK
+      // --------------------------------------------------------
+
+      if (
+        !employee.is_active
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Cannot assign certificate to an inactive employee.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // RECIPIENT NAME
+      // --------------------------------------------------------
+
+      if (
+        cleanRecipientName
+          .toLowerCase() !==
+        employee.name
+          .trim()
+          .toLowerCase()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Recipient name must match the selected employee name.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // COURSE
+      // --------------------------------------------------------
+
+      if (
+        cleanCourseName.length ===
+        0 ||
+        cleanCourseName.length >
+          200
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Course name must be between 1 and 200 characters.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // ISSUER
+      // --------------------------------------------------------
+
+      if (
+        cleanIssuerName.length ===
+        0 ||
+        cleanIssuerName.length >
+          200
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Issuer name must be between 1 and 200 characters.",
+        });
+      }
+
+      // --------------------------------------------------------
+      // TRANSACTION
+      // --------------------------------------------------------
+
+      await client.query(
+        "BEGIN"
+      );
+
+      // --------------------------------------------------------
       // UPDATE
-      // -----------------------------------------------
+      //
+      // IMPORTANT:
+      // certificate_no is NOT updated.
+      // certificate_type is NOT updated.
+      // --------------------------------------------------------
 
-      const result =
-        await pool.query(
-
+      const updateResult =
+        await client.query(
           `
           UPDATE certificates
 
           SET
+            recipient_name = $1,
+            course_name = $2,
+            issuer_name = $3,
+            issue_date = $4,
+            employee_id = $5
 
-            certificate_no = $1,
-
-            recipient_name = $2,
-
-            course_name = $3,
-
-            issuer_name = $4,
-
-            issue_date = $5,
-
-            employee_id = $6
-
-          WHERE id = $7
+          WHERE id = $6
 
           RETURNING
-
             id,
-
             certificate_no,
-
+            certificate_type,
             recipient_name,
-
             course_name,
-
             issuer_name,
-
             issue_date,
-
             verification_token,
-
             status,
-
             employee_id,
-
             created_at,
-
             revoked_at
           `,
-
           [
-            cleanCertificateNo,
-
-            cleanRecipientName,
-
+            employee.name,
             cleanCourseName,
-
             cleanIssuerName,
-
-            issueDate,
-
-            employeeId || null,
-
-            id,
+            cleanIssueDate,
+            cleanEmployeeId,
+            certificateId,
           ]
-
         );
 
-
       const certificate =
-        result.rows[0];
+        updateResult.rows[0];
 
-
-      // -----------------------------------------------
+      // --------------------------------------------------------
       // AUDIT
-      // -----------------------------------------------
+      // --------------------------------------------------------
 
-      await pool.query(
-
+      await client.query(
         `
-        INSERT INTO certificate_audit_logs
-        (
+        INSERT INTO certificate_audit_logs (
           certificate_id,
           action,
           performed_by,
           details
         )
 
-        VALUES
-        (
+        VALUES (
           $1,
           $2,
           $3,
           $4
         )
         `,
-
         [
-          id,
+          certificateId,
 
-          "UPDATE_CERTIFICATE",
+          "CERTIFICATE_UPDATED",
 
-          req.admin?.id ||
-            null,
+          req.admin?.email ||
+            req.admin?.id?.toString() ||
+            "admin",
 
           JSON.stringify({
-            certificateNo:
+            certificate_no:
               certificate.certificate_no,
 
-            recipientName:
-              certificate.recipient_name,
+            certificate_type:
+              certificate.certificate_type,
 
-            employeeId:
-              certificate.employee_id,
+            employee_id:
+              cleanEmployeeId,
+
+            employee_email:
+              employee.email,
           }),
-
         ]
-
       );
 
+      await client.query(
+        "COMMIT"
+      );
 
-      return res.json({
+      return res.status(200).json({
+        success: true,
 
         message:
           "Certificate updated successfully.",
 
-        certificate,
+        certificate: {
+          ...certificate,
 
+          employee_name:
+            employee.name,
+
+          employee_email:
+            employee.email,
+        },
       });
-
     } catch (error) {
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+      } catch {}
 
       console.error(
         "Update certificate error:",
         error
       );
 
-      next(error);
-
-    }
-
-  }
-
-);
-
-
-// =====================================================
-// REVOKE CERTIFICATE
-// PATCH /api/admin/certificates/:id/revoke
-// =====================================================
-
-app.patch(
-
-  "/api/admin/certificates/:id/revoke",
-
-  requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
-
-    try {
-
-      const {
-        id,
-      } = req.params;
-
-
-      // -----------------------------------------------
-      // FIND CERTIFICATE
-      // -----------------------------------------------
-
-      const existing =
-        await pool.query(
-
-          `
-          SELECT
-
-            id,
-
-            certificate_no,
-
-            recipient_name,
-
-            status
-
-          FROM certificates
-
-          WHERE id = $1
-
-          LIMIT 1
-          `,
-
-          [
-            id,
-          ]
-
-        );
-
-
       if (
-        existing.rows.length === 0
+        error.code === "23505"
       ) {
-
-        return res.status(404).json({
-
+        return res.status(409).json({
+          success: false,
           message:
-            "Certificate not found.",
-
+            "Certificate already exists.",
         });
-
       }
 
+      next(error);
+    } finally {
+      client.release();
+    }
+  }
+);
+
+// ============================================================
+// ADMIN - REVOKE CERTIFICATE
+// ============================================================
+
+app.patch(
+  "/api/admin/certificates/:id/revoke",
+  requireAdmin,
+  async (req, res, next) => {
+    const client =
+      await pool.connect();
+
+    try {
+      const certificateId =
+        Number(
+          req.params.id
+        );
+
+      if (
+        !Number.isInteger(
+          certificateId
+        ) ||
+        certificateId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid certificate ID.",
+        });
+      }
+
+      await client.query(
+        "BEGIN"
+      );
+
+      const existing =
+        await client.query(
+          `
+          SELECT
+            id,
+            certificate_no,
+            status
+          FROM certificates
+          WHERE id = $1
+          FOR UPDATE
+          `,
+          [certificateId]
+        );
+
+      if (
+        existing.rows.length ===
+        0
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return res.status(404).json({
+          success: false,
+          message:
+            "Certificate not found.",
+        });
+      }
 
       const certificate =
         existing.rows[0];
-
-
-      // -----------------------------------------------
-      // ALREADY REVOKED
-      // -----------------------------------------------
 
       if (
         certificate.status ===
         "revoked"
       ) {
+        await client.query(
+          "ROLLBACK"
+        );
 
-        return res.status(400).json({
-
+        return res.status(409).json({
+          success: false,
           message:
             "Certificate is already revoked.",
-
         });
-
       }
 
-
-      // -----------------------------------------------
-      // REVOKE
-      // -----------------------------------------------
-
       const result =
-        await pool.query(
-
+        await client.query(
           `
           UPDATE certificates
 
           SET
-
             status = 'revoked',
-
             revoked_at =
               CURRENT_TIMESTAMP
 
           WHERE id = $1
 
           RETURNING
-
             id,
-
             certificate_no,
-
-            recipient_name,
-
-            course_name,
-
-            issuer_name,
-
-            issue_date,
-
             status,
-
-            revoked_at,
-
-            employee_id
+            revoked_at
           `,
-
-          [
-            id,
-          ]
-
+          [certificateId]
         );
 
-
-      // -----------------------------------------------
-      // AUDIT
-      // -----------------------------------------------
-
-      await pool.query(
-
+      await client.query(
         `
-        INSERT INTO certificate_audit_logs
-        (
+        INSERT INTO certificate_audit_logs (
           certificate_id,
           action,
           performed_by,
           details
         )
 
-        VALUES
-        (
+        VALUES (
           $1,
           $2,
           $3,
           $4
         )
         `,
-
         [
-          id,
+          certificateId,
 
-          "REVOKE_CERTIFICATE",
+          "CERTIFICATE_REVOKED",
 
-          req.admin?.id ||
-            null,
+          req.admin?.email ||
+            req.admin?.id?.toString() ||
+            "admin",
 
           JSON.stringify({
-
-            certificateNo:
+            certificate_no:
               certificate.certificate_no,
-
-            recipientName:
-              certificate.recipient_name,
-
-            previousStatus:
-              certificate.status,
-
-            newStatus:
-              "revoked",
-
           }),
-
         ]
-
       );
 
+      await client.query(
+        "COMMIT"
+      );
 
-      return res.json({
+      return res.status(200).json({
+        success: true,
 
         message:
           "Certificate revoked successfully.",
 
         certificate:
           result.rows[0],
-
       });
-
     } catch (error) {
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+      } catch {}
 
       console.error(
         "Revoke certificate error:",
@@ -1434,422 +1631,199 @@ app.patch(
       );
 
       next(error);
-
+    } finally {
+      client.release();
     }
-
   }
-
 );
 
-
-// =====================================================
-// DELETE CERTIFICATE
-// DELETE /api/admin/certificates/:id
-// =====================================================
+// ============================================================
+// ADMIN - DELETE CERTIFICATE
+// ============================================================
 
 app.delete(
-
   "/api/admin/certificates/:id",
-
   requireAdmin,
-
-  async (
-    req,
-    res,
-    next
-  ) => {
-
+  async (req, res, next) => {
     const client =
       await pool.connect();
 
-
     try {
+      const certificateId =
+        Number(
+          req.params.id
+        );
 
-      const {
-        id,
-      } = req.params;
-
+      if (
+        !Number.isInteger(
+          certificateId
+        ) ||
+        certificateId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid certificate ID.",
+        });
+      }
 
       await client.query(
         "BEGIN"
       );
 
-
-      // -----------------------------------------------
-      // FIND CERTIFICATE
-      // -----------------------------------------------
-
-      const certificateResult =
+      const existing =
         await client.query(
-
           `
           SELECT
-
             id,
-
-            certificate_no,
-
-            recipient_name,
-
-            status
-
+            certificate_no
           FROM certificates
-
           WHERE id = $1
-
           FOR UPDATE
           `,
-
-          [
-            id,
-          ]
-
+          [certificateId]
         );
 
-
       if (
-        certificateResult.rows.length ===
+        existing.rows.length ===
         0
       ) {
-
         await client.query(
           "ROLLBACK"
         );
 
         return res.status(404).json({
-
+          success: false,
           message:
             "Certificate not found.",
-
         });
-
       }
 
-
-      const certificate =
-        certificateResult.rows[0];
-
-
-      // -----------------------------------------------
-      // AUDIT LOG
-      //
-      // IMPORTANT:
-      // Delete audit records first if the
-      // certificate table has a foreign key.
-      // -----------------------------------------------
-
       await client.query(
-
-        `
-        INSERT INTO certificate_audit_logs
-        (
-          certificate_id,
-          action,
-          performed_by,
-          details
-        )
-
-        VALUES
-        (
-          $1,
-          $2,
-          $3,
-          $4
-        )
-        `,
-
-        [
-          id,
-
-          "DELETE_CERTIFICATE",
-
-          req.admin?.id ||
-            null,
-
-          JSON.stringify({
-
-            certificateNo:
-              certificate.certificate_no,
-
-            recipientName:
-              certificate.recipient_name,
-
-            previousStatus:
-              certificate.status,
-
-          }),
-
-        ]
-
-      );
-
-
-      // -----------------------------------------------
-      // DELETE AUDIT LOGS
-      // -----------------------------------------------
-
-      await client.query(
-
         `
         DELETE FROM certificate_audit_logs
-
         WHERE certificate_id = $1
         `,
-
-        [
-          id,
-        ]
-
+        [certificateId]
       );
-
-
-      // -----------------------------------------------
-      // DELETE CERTIFICATE
-      // -----------------------------------------------
 
       await client.query(
-
         `
         DELETE FROM certificates
-
         WHERE id = $1
         `,
-
-        [
-          id,
-        ]
-
+        [certificateId]
       );
-
 
       await client.query(
         "COMMIT"
       );
 
-
-      return res.json({
-
+      return res.status(200).json({
+        success: true,
         message:
           "Certificate deleted successfully.",
-
+        certificateId,
       });
-
     } catch (error) {
-
-      await client.query(
-        "ROLLBACK"
-      );
-
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+      } catch {}
 
       console.error(
         "Delete certificate error:",
         error
       );
 
-
       next(error);
-
     } finally {
-
       client.release();
-
     }
-
   }
-
 );
 
-// =====================================================
-// GET EMPLOYEE QR
-// GET /api/employee/qr
-// =====================================================
+// ============================================================
+// EMPLOYEE - GET QR STATUS
+// ============================================================
 
 app.get(
   "/api/employee/qr",
   requireEmployee,
   async (req, res, next) => {
     try {
-      const employeeId = req.employee?.id;
+      const employeeId =
+        Number(
+          req.employee.id
+        );
 
-      if (!employeeId) {
-        return res.status(401).json({
-          message: "Employee authentication required.",
-        });
-      }
+      const result =
+        await pool.query(
+          `
+          SELECT
+            c.id,
+            c.certificate_no,
+            c.certificate_type,
+            c.recipient_name,
+            c.course_name,
+            c.issuer_name,
+            c.issue_date,
+            c.verification_token,
+            c.status,
+            c.qr_generated_at
 
-      const result = await pool.query(
-        `
-        SELECT
-          id,
-          certificate_no,
-          recipient_name,
-          course_name,
-          issuer_name,
-          issue_date,
-          verification_token,
-          status,
-          qr_generated_at
-        FROM certificates
-        WHERE employee_id = $1
-          AND status = 'issued'
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [employeeId]
-      );
+          FROM certificates c
 
-      if (result.rows.length === 0) {
+          WHERE c.employee_id = $1
+            AND c.status = 'issued'
+
+          ORDER BY c.created_at DESC
+
+          LIMIT 1
+          `,
+          [employeeId]
+        );
+
+      if (
+        result.rows.length ===
+        0
+      ) {
         return res.status(404).json({
-          message: "No issued certificate found for this employee.",
-        });
-      }
-
-      const certificate = result.rows[0];
-
-      const clientUrl =
-        process.env.CLIENT_URL ||
-        "http://localhost:5173";
-
-      const verificationUrl =
-        `${clientUrl}/verify?token=${certificate.verification_token}`;
-
-      return res.json({
-        qrGenerated: Boolean(certificate.qr_generated_at),
-        url: certificate.qr_generated_at
-          ? verificationUrl
-          : null,
-
-        certificate: {
-          id: certificate.id,
-          certificateNo: certificate.certificate_no,
-          recipientName: certificate.recipient_name,
-          courseName: certificate.course_name,
-          issuerName: certificate.issuer_name,
-          issueDate: certificate.issue_date,
-          status: certificate.status,
-        },
-      });
-
-    } catch (error) {
-      console.error("GET QR ERROR:", error);
-      next(error);
-    }
-  }
-);
-
-// =====================================================
-// EMPLOYEE QR
-// POST /api/employee/qr
-// =====================================================
-
-app.post(
-  "/api/employee/qr",
-  requireEmployee,
-  async (req, res, next) => {
-    try {
-      const employeeId = req.employee?.id;
-
-      if (!employeeId) {
-        return res.status(401).json({
-          message: "Employee authentication required.",
-        });
-      }
-
-      const result = await pool.query(
-        `
-        SELECT
-          id,
-          certificate_no,
-          recipient_name,
-          course_name,
-          issuer_name,
-          issue_date,
-          verification_token,
-          status,
-          qr_generated_at
-        FROM certificates
-        WHERE employee_id = $1
-          AND status = 'issued'
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [employeeId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({
+          success: false,
           message:
             "No issued certificate found for this employee.",
         });
       }
 
-      const certificate = result.rows[0];
+      const certificate =
+        result.rows[0];
 
-      const clientUrl =
-        process.env.CLIENT_URL ||
-        "http://localhost:5173";
+      let verificationUrl =
+        null;
 
-      const verificationUrl =
-        `${clientUrl}/verify?token=${certificate.verification_token}`;
-
-      // ==========================================
-      // QR ALREADY GENERATED
-      // ==========================================
-
-      if (certificate.qr_generated_at) {
-        return res.json({
-          message: "QR code already generated.",
-          alreadyGenerated: true,
-          url: verificationUrl,
-
-          certificate: {
-            id: certificate.id,
-            certificateNo: certificate.certificate_no,
-            recipientName: certificate.recipient_name,
-            courseName: certificate.course_name,
-            issuerName: certificate.issuer_name,
-            issueDate: certificate.issue_date,
-            status: certificate.status,
-          },
-        });
+      if (
+        certificate.qr_generated_at
+      ) {
+        verificationUrl =
+          `${CLIENT_URL}/verify?token=${certificate.verification_token}`;
       }
 
-      // ==========================================
-      // FIRST QR GENERATION
-      // ==========================================
+      return res.status(200).json({
+        success: true,
 
-      await pool.query(
-        `
-        UPDATE certificates
-        SET qr_generated_at = NOW()
-        WHERE id = $1
-        `,
-        [certificate.id]
-      );
+        qrGenerated:
+          Boolean(
+            certificate.qr_generated_at
+          ),
 
-      // ==========================================
-      // RESPONSE
-      // ==========================================
+        verificationUrl,
 
-      return res.json({
-        message: "QR verification URL generated.",
-        alreadyGenerated: false,
-        url: verificationUrl,
-
-        certificate: {
-          id: certificate.id,
-          certificateNo: certificate.certificate_no,
-          recipientName: certificate.recipient_name,
-          courseName: certificate.course_name,
-          issuerName: certificate.issuer_name,
-          issueDate: certificate.issue_date,
-          status: certificate.status,
-        },
+        certificate,
       });
-
     } catch (error) {
       console.error(
-        "QR GENERATION ERROR:",
+        "Get employee QR error:",
         error
       );
 
@@ -1857,294 +1831,444 @@ app.post(
     }
   }
 );
-// =====================================================
-// PUBLIC CERTIFICATE VERIFICATION
-// GET /api/verify/:token
-// =====================================================
 
-app.get("/api/verify/:token", async (req, res, next) => {
-  try {
-    const token = req.params.token;
+// ============================================================
+// EMPLOYEE - GENERATE QR
+// ============================================================
 
-    console.log("VERIFY TOKEN:", token);
+app.post(
+  "/api/employee/qr",
+  requireEmployee,
+  async (req, res, next) => {
+    try {
+      const employeeId =
+        Number(
+          req.employee.id
+        );
 
-    const result = await pool.query(
-      `
-      SELECT
-        certificate_no,
-        recipient_name,
-        course_name,
-        issuer_name,
-        issue_date,
-        status
-      FROM certificates
-      WHERE verification_token = $1
-      LIMIT 1
-      `,
-      [token]
-    );
+      const result =
+        await pool.query(
+          `
+          SELECT
+            id,
+            certificate_no,
+            certificate_type,
+            recipient_name,
+            course_name,
+            issuer_name,
+            issue_date,
+            verification_token,
+            status,
+            qr_generated_at
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        verified: false,
-        message: "Certificate not found.",
+          FROM certificates
+
+          WHERE employee_id = $1
+            AND status = 'issued'
+
+          ORDER BY created_at DESC
+
+          LIMIT 1
+          `,
+          [employeeId]
+        );
+
+      if (
+        result.rows.length ===
+        0
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "No issued certificate found for this employee.",
+        });
+      }
+
+      const certificate =
+        result.rows[0];
+
+      if (
+        certificate.qr_generated_at
+      ) {
+        const verificationUrl =
+          `${CLIENT_URL}/verify?token=${certificate.verification_token}`;
+
+        return res.status(200).json({
+          success: true,
+          qrGenerated: true,
+          alreadyGenerated: true,
+          verificationUrl,
+          certificate,
+        });
+      }
+
+      const updateResult =
+        await pool.query(
+          `
+          UPDATE certificates
+
+          SET
+            qr_generated_at =
+              CURRENT_TIMESTAMP
+
+          WHERE id = $1
+
+          RETURNING
+            qr_generated_at
+          `,
+          [certificate.id]
+        );
+
+      const qrGeneratedAt =
+        updateResult.rows[0]
+          .qr_generated_at;
+
+      const verificationUrl =
+        `${CLIENT_URL}/verify?token=${certificate.verification_token}`;
+
+      return res.status(200).json({
+        success: true,
+        qrGenerated: true,
+        alreadyGenerated: false,
+        verificationUrl,
+
+        certificate: {
+          ...certificate,
+
+          qr_generated_at:
+            qrGeneratedAt,
+        },
       });
+    } catch (error) {
+      console.error(
+        "Generate employee QR error:",
+        error
+      );
+
+      next(error);
     }
-
-    const certificate = result.rows[0];
-
-    if (certificate.status !== "issued") {
-      return res.status(403).json({
-        verified: false,
-        message: "This certificate has been revoked.",
-      });
-    }
-
-    return res.json({
-      verified: true,
-      message: "Certificate is valid.",
-      certificate: {
-        certificateNo: certificate.certificate_no,
-        recipientName: certificate.recipient_name,
-        courseName: certificate.course_name,
-        issuerName: certificate.issuer_name,
-        issueDate: certificate.issue_date,
-        status: certificate.status,
-      },
-    });
-
-  } catch (error) {
-    console.error("VERIFY ERROR:", error);
-    next(error);
   }
-});
-
-// =====================================================
-// 404 HANDLER
-// =====================================================
-
-app.use(
-
-  (req, res) => {
-
-    res.status(404).json({
-
-      message:
-        "Route not found.",
-
-      path:
-        req.originalUrl,
-
-    });
-
-  }
-
 );
 
+// ============================================================
+// PUBLIC VERIFICATION RATE LIMIT
+// ============================================================
 
-// =====================================================
-// GLOBAL ERROR HANDLER
-// =====================================================
+const verifyLimiter =
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
+
+    limit: 60,
+
+    standardHeaders:
+      "draft-8",
+
+    legacyHeaders: false,
+
+    message: {
+      success: false,
+      message:
+        "Too many verification requests. Please try again later.",
+    },
+  });
+
+// ============================================================
+// PUBLIC CERTIFICATE VERIFICATION
+// ============================================================
+
+app.get(
+  "/api/verify/:token",
+  verifyLimiter,
+  async (req, res, next) => {
+    try {
+      const token =
+        String(
+          req.params.token || ""
+        ).trim();
+
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+      if (
+        !uuidRegex.test(token)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid verification token.",
+        });
+      }
+
+      const result =
+        await pool.query(
+          `
+          SELECT
+            c.id,
+            c.certificate_no,
+            c.certificate_type,
+            c.recipient_name,
+            c.course_name,
+            c.issuer_name,
+            c.issue_date,
+            c.verification_token,
+            c.status,
+            c.created_at,
+            c.revoked_at,
+
+            e.name AS employee_name,
+            e.email AS employee_email
+
+          FROM certificates c
+
+          LEFT JOIN employee_users e
+            ON c.employee_id = e.id
+
+          WHERE c.verification_token = $1
+
+          LIMIT 1
+          `,
+          [token]
+        );
+
+      if (
+        result.rows.length ===
+        0
+      ) {
+        return res.status(404).json({
+          success: false,
+          valid: false,
+          message:
+            "Certificate not found.",
+        });
+      }
+
+      const certificate =
+        result.rows[0];
+
+      // --------------------------------------------------------
+      // REVOKED
+      // --------------------------------------------------------
+
+      if (
+        certificate.status !==
+        "issued"
+      ) {
+        return res.status(200).json({
+          success: true,
+          valid: false,
+
+          status:
+            certificate.status,
+
+          message:
+            "This certificate has been revoked.",
+
+          certificate: {
+            certificate_no:
+              certificate.certificate_no,
+
+            certificate_type:
+              certificate.certificate_type,
+
+            recipient_name:
+              certificate.recipient_name,
+
+            course_name:
+              certificate.course_name,
+
+            issuer_name:
+              certificate.issuer_name,
+
+            issue_date:
+              certificate.issue_date,
+
+            verification_token:
+              certificate.verification_token,
+
+            employee_name:
+              certificate.employee_name,
+
+            employee_email:
+              certificate.employee_email,
+
+            status:
+              certificate.status,
+
+            revoked_at:
+              certificate.revoked_at,
+          },
+        });
+      }
+
+      // --------------------------------------------------------
+      // VALID
+      // --------------------------------------------------------
+
+      return res.status(200).json({
+        success: true,
+        valid: true,
+        status: "issued",
+
+        message:
+          "Certificate is valid.",
+
+        certificate: {
+          id:
+            certificate.id,
+
+          certificate_no:
+            certificate.certificate_no,
+
+          certificate_type:
+            certificate.certificate_type,
+
+          recipient_name:
+            certificate.recipient_name,
+
+          course_name:
+            certificate.course_name,
+
+          issuer_name:
+            certificate.issuer_name,
+
+          issue_date:
+            certificate.issue_date,
+
+          verification_token:
+            certificate.verification_token,
+
+          employee_name:
+            certificate.employee_name,
+
+          employee_email:
+            certificate.employee_email,
+
+          status:
+            certificate.status,
+
+          created_at:
+            certificate.created_at,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Certificate verification error:",
+        error
+      );
+
+      next(error);
+    }
+  }
+);
+
+// ============================================================
+// 404 HANDLER
+// ============================================================
 
 app.use(
+  (req, res) => {
+    return res.status(404).json({
+      success: false,
+      message:
+        "Route not found.",
+      path:
+        req.originalUrl,
+    });
+  }
+);
 
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
+// ============================================================
+// GLOBAL ERROR HANDLER
+// ============================================================
 
+app.use(
+  (error, req, res, next) => {
     console.error(
-      "======================================"
-    );
-
-    console.error(
-      "SERVER ERROR"
-    );
-
-    console.error(
+      "GLOBAL ERROR:",
       error
     );
 
-    console.error(
-      "======================================"
-    );
-
-
-    // -----------------------------------------------
-    // DUPLICATE KEY
-    // -----------------------------------------------
-
     if (
-      error.code ===
-      "23505"
+      error.message ===
+      "Not allowed by CORS"
     ) {
-
-      return res.status(409).json({
-
+      return res.status(403).json({
+        success: false,
         message:
-          "A record with the same value already exists.",
-
+          "CORS origin not allowed.",
       });
-
     }
 
-
-    // -----------------------------------------------
-    // FOREIGN KEY
-    // -----------------------------------------------
-
-    if (
-      error.code ===
-      "23503"
-    ) {
-
-      return res.status(400).json({
-
-        message:
-          "This record cannot be changed because it is referenced by another record.",
-
-      });
-
+    if (res.headersSent) {
+      return next(error);
     }
-
-
-    // -----------------------------------------------
-    // CHECK CONSTRAINT
-    // -----------------------------------------------
-
-    if (
-      error.code ===
-      "23514"
-    ) {
-
-      return res.status(400).json({
-
-        message:
-          "Database validation failed.",
-
-      });
-
-    }
-
-
-    // -----------------------------------------------
-    // JSON ERROR
-    // -----------------------------------------------
-
-    if (
-      error instanceof
-        SyntaxError &&
-      error.status === 400 &&
-      "body" in error
-    ) {
-
-      return res.status(400).json({
-
-        message:
-          "Invalid JSON request body.",
-
-      });
-
-    }
-
-
-    // -----------------------------------------------
-    // DEFAULT
-    // -----------------------------------------------
 
     return res.status(500).json({
-
+      success: false,
       message:
         "Internal server error.",
-
-      ...(process.env.NODE_ENV !==
-        "production" && {
-
-        error:
-          error.message,
-
-      }),
-
     });
-
   }
-
 );
 
-
-// =====================================================
+// ============================================================
 // START SERVER
-// =====================================================
+// ============================================================
 
 async function startServer() {
-
   try {
-
-    // -----------------------------------------------
-    // DATABASE TEST
-    // -----------------------------------------------
-
     await pool.query(
       "SELECT 1"
     );
 
-
     console.log(
-      "Database connected successfully."
+      "PostgreSQL connected successfully."
     );
-
-
-    // -----------------------------------------------
-    // SERVER
-    // -----------------------------------------------
 
     app.listen(
       PORT,
+      "0.0.0.0",
       () => {
-
         console.log(
-          "======================================"
+          "=========================================="
         );
 
         console.log(
-          `Certificate API running on http://localhost:${PORT}`
+          "Certificate API Server"
         );
 
         console.log(
-          `Frontend URL: ${CLIENT_URL}`
+          `Local: http://localhost:${PORT}`
         );
 
         console.log(
-          "======================================"
+          `LAN: http://192.168.1.5:${PORT}`
         );
 
+        console.log(
+          `Client: ${CLIENT_URL}`
+        );
+
+        console.log(
+          "=========================================="
+        );
       }
     );
-
   } catch (error) {
-
     console.error(
-      "Failed to start server."
-    );
-
-    console.error(
+      "Unable to start server:",
       error
     );
 
     process.exit(1);
-
   }
-
 }
-
 
 startServer();
 
-
-// =====================================================
+// ============================================================
 // EXPORT
-// =====================================================
+// ============================================================
 
 module.exports = app;
