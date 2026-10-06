@@ -2,8 +2,6 @@ const path = require("path");
 const dotenv = require("dotenv");
 const { Pool } = require("pg");
 
-// Load local .env only during local development.
-// Vercel provides environment variables automatically.
 if (process.env.NODE_ENV !== "production") {
   const envPath = path.resolve(__dirname, ".env");
 
@@ -19,7 +17,6 @@ if (process.env.NODE_ENV !== "production") {
   console.log("Loaded environment file:", envPath);
 }
 
-// Required database variables
 const requiredVariables = [
   "DB_HOST",
   "DB_PORT",
@@ -38,28 +35,31 @@ if (missingVariables.length > 0) {
   );
 }
 
-// PostgreSQL configuration
-const poolConfig = {
+console.log("PostgreSQL configuration:", {
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  ssl: true,
+  nodeEnv: process.env.NODE_ENV,
+});
+
+const pool = new Pool({
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT),
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 
-  // Required for Neon PostgreSQL
   ssl: {
     rejectUnauthorized: true,
   },
 
-  // Connection settings
   connectionTimeoutMillis: 15000,
-  max: Number(process.env.DB_POOL_MAX) || 5,
   idleTimeoutMillis: 10000,
-};
+  max: Number(process.env.DB_POOL_MAX) || 5,
+});
 
-const pool = new Pool(poolConfig);
-
-// Handle unexpected PostgreSQL pool errors
 pool.on("error", (error) => {
   console.error(
     "Unexpected PostgreSQL pool error:",
