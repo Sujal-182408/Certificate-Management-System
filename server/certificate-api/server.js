@@ -2264,11 +2264,8 @@ async function startServer() {
     process.exit(1);
   }
 }
-
-startServer();
-
-// ============================================================
-// EXPORT
-// ============================================================
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app;
